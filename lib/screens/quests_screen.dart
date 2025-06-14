@@ -37,11 +37,73 @@ class _QuestsScreenState extends State<QuestsScreen>
     super.dispose();
   }
 
+  Future<void> _generateNewQuest() async {
+    final playerProvider = context.read<PlayerProvider>();
+    final questProvider = context.read<QuestProvider>();
+
+    if (playerProvider.isLoading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Дані гравця ще завантажуються. Спробуйте пізніше.')),
+      );
+      return;
+    }
+    if (questProvider.isGeneratingQuest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Завдання вже генерується... Зачекайте.')),
+      );
+      return;
+    }
+
+    // Опціонально: показати діалог для вибору параметрів генерації
+    // Наприклад, вибір цільової характеристики
+    PlayerStat? selectedStat;
+    // Можна додати простий діалог для вибору, або генерувати випадково/загальне
+    // Для прикладу, поки без вибору користувачем:
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          duration: Duration(seconds: 10),
+          content: Row(children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 15),
+            Text('Генерація завдання через Gemini...')
+          ])),
+    );
+
+    QuestModel? generatedQuest = await questProvider.fetchAndAddGeneratedQuest(
+      playerProvider: playerProvider,
+      // targetStat: selectedStat, // Якщо буде вибір
+      customInstruction:
+          "Зроби це завдання трохи незвичним, але корисним.", // Приклад кастомної інструкції
+    );
+
+    ScaffoldMessenger.of(context)
+        .hideCurrentSnackBar(); // Ховаємо індикатор завантаження
+
+    if (generatedQuest != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Нове завдання "${generatedQuest.title}" згенеровано та додано!'),
+          backgroundColor: Colors.green[700],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не вдалося згенерувати завдання. Спробуйте ще раз.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final questProvider = context.watch<QuestProvider>();
     final playerProvider = context
-        .read<PlayerProvider>(); // read, бо використовуємо тільки для дії
+        .read<PlayerProvider>(); // Тут watch не потрібен, якщо тільки для дій
 
     if (questProvider.isLoading) {
       return Scaffold(
@@ -133,30 +195,28 @@ class _QuestsScreenState extends State<QuestsScreen>
               context, questProvider.completedQuests, playerProvider, false),
         ],
       ),
-      // TODO: Кнопка для генерації нового завдання через Gemini (Фаза 3)
       floatingActionButton: _tabController.index == 0
           ? FloatingActionButton.extended(
-              onPressed: () {
-                // Тут буде логіка генерації завдання через Gemini API
-                // Поки що можемо додати тестовий квест
-                final testQuest = QuestModel(
-                    title: "Тестове Згенероване Завдання",
-                    description:
-                        "Це завдання було додано для тестування кнопки.",
-                    xpReward: 50,
-                    difficulty: QuestDifficulty.C,
-                    type: QuestType.generated, // або milestone
-                    statRewards: {PlayerStat.agility: 1});
-                questProvider.addQuest(testQuest);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content:
-                          Text('Додано тестове завдання: ${testQuest.title}')),
-                );
-              },
-              label: const Text('Нове завдання'),
-              icon: const Icon(Icons.add_task_sharp),
-              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+              onPressed: questProvider.isGeneratingQuest
+                  ? null
+                  : _generateNewQuest, // Деактивуємо кнопку під час генерації
+              label: questProvider.isGeneratingQuest
+                  ? const Text('Генерація...')
+                  : const Text('Нове завдання'),
+              icon: questProvider.isGeneratingQuest
+                  ? Container(
+                      // Маленький індикатор завантаження
+                      width: 20,
+                      height: 20,
+                      padding: const EdgeInsets.all(2.0),
+                      child: const CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.black54),
+                    )
+                  : const Icon(
+                      Icons.auto_awesome_outlined), // Іконка для Gemini
+              backgroundColor: questProvider.isGeneratingQuest
+                  ? Colors.grey
+                  : Theme.of(context).colorScheme.secondaryContainer,
             )
           : null,
     );

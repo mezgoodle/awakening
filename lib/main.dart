@@ -2,11 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/player_provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'providers/quest_provider.dart'; // Імпортуємо QuestProvider
 // import 'screens/player_status_screen.dart'; // Будемо використовувати новий HomeScreen
 import 'screens/home_screen.dart'; // Новий головний екран з навігацією
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   runApp(
     MultiProvider(
       providers: [

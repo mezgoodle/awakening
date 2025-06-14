@@ -5,15 +5,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quest_model.dart';
 import '../models/player_model.dart'; // Для PlayerStat, PlayerProvider не потрібен прямо тут
 import 'player_provider.dart'; // Потрібен для нарахування нагород
+import '../services/gemini_quest_service.dart'; // Імпортуємо наш сервіс
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
   List<QuestModel> _completedQuests = [];
   bool _isLoading = true;
+  final GeminiQuestService _geminiService =
+      GeminiQuestService(); // Створюємо екземпляр сервісу
+  bool _isGeneratingQuest = false; // Прапорець для індикації завантаження
 
   List<QuestModel> get activeQuests => _activeQuests;
   List<QuestModel> get completedQuests => _completedQuests;
   bool get isLoading => _isLoading;
+  bool get isGeneratingQuest => _isGeneratingQuest;
 
   static const String _activeQuestsKey = 'activeQuestsData';
   static const String _completedQuestsKey = 'completedQuestsData';
@@ -131,50 +136,50 @@ class QuestProvider with ChangeNotifier {
     bool shouldGenerate = true;
     if (lastGenerationDateStr != null) {
       final lastGenerationDate = DateTime.parse(lastGenerationDateStr);
-      if (lastGenerationDate == todayDateOnly) {
-        shouldGenerate = false; // Вже генерували сьогодні
-        print("Daily quests already generated today.");
+      if (lastGenerationDate == todayDateOnly &&
+          _activeQuests.any((q) => q.type == QuestType.daily)) {
+        // Додаткова перевірка, чи є вже щоденні
+        shouldGenerate = false;
+        print("Daily quests already exist or generated today.");
       }
     }
 
     if (shouldGenerate) {
       print(
           "Generating daily quests for ${todayDateOnly.toIso8601String()}...");
-      // Видаляємо старі (невиконані) щоденні квести, якщо потрібно
       _activeQuests.removeWhere(
           (quest) => quest.type == QuestType.daily && !quest.isCompleted);
 
-      // Приклади щоденних квестів (поки що хардкод)
-      // Тут в майбутньому буде логіка Gemini API або більш розумна генерація
-      final dailyQuests = [
-        QuestModel(
-            title: "Ранкова Розминка",
-            description:
-                "Виконай 10 віджимань, 20 присідань та 5 хвилин розтяжки.",
-            xpReward:
-                20 + (playerProvider.player.level * 2), // Динамічна нагорода
-            difficulty: QuestDifficulty.E,
-            type: QuestType.daily,
-            statRewards: {PlayerStat.stamina: 1}),
-        QuestModel(
-            title: "Ментальна Концентрація",
-            description:
-                "Присвяти 15 хвилин медитації або читанню корисної книги.",
-            xpReward: 15 + (playerProvider.player.level * 2),
-            difficulty: QuestDifficulty.E,
-            type: QuestType.daily,
-            statRewards: {PlayerStat.intelligence: 1}),
-        QuestModel(
-            title: "Дослідження Оточення",
-            description:
-                "Пройдись новим маршрутом або відвідай місце, де давно не був (мінімум 30 хвилин).",
-            xpReward: 25 + (playerProvider.player.level * 3),
-            difficulty: QuestDifficulty.D,
-            type: QuestType.daily,
-            statRewards: {PlayerStat.perception: 1}),
-      ];
+      _isGeneratingQuest = true;
+      notifyListeners(); // Повідомити UI про початок генерації
 
-      for (var quest in dailyQuests) {
+      List<QuestModel> newDailyQuests = [];
+      // Спробуємо згенерувати 2-3 щоденних завдання через Gemini
+      // Можна додати різні targetStat для різноманітності
+      List<PlayerStat?> dailyTargets = [
+        PlayerStat.stamina,
+        PlayerStat.intelligence,
+        null
+      ]; // null для загального
+
+      for (int i = 0; i < 2; i++) {
+        // Згенеруємо 2 щоденних
+        QuestModel? generatedQuest = await _geminiService.generateQuest(
+            player: playerProvider.player,
+            questType: QuestType.daily,
+            targetStat: dailyTargets[i % dailyTargets.length], // Чергуємо цілі
+            customPromptInstruction:
+                "Це має бути завдання, яке можна виконувати щодня для підтримки форми або розвитку навичок.");
+        if (generatedQuest != null) {
+          newDailyQuests.add(generatedQuest);
+        } else {
+          // Якщо Gemini не зміг, додамо хардкодний варіант
+          print("Gemini failed to generate daily quest, adding fallback.");
+          newDailyQuests.add(_getFallbackDailyQuest(playerProvider.player, i));
+        }
+      }
+
+      for (var quest in newDailyQuests) {
         // Перевіряємо, чи квест з таким самим заголовком (для уникнення дублів щоденних)
         // вже існує серед активних або виконаних СЬОГОДНІ
         bool alreadyExistsToday = _activeQuests.any(
@@ -187,16 +192,78 @@ class QuestProvider with ChangeNotifier {
                         q.completedAt!.day) ==
                     todayDateOnly);
         if (!alreadyExistsToday) {
-          addQuest(quest);
+          addQuest(
+              quest); // addQuest вже викликає _saveQuests і notifyListeners
         }
       }
 
-      await prefs.setString(
-          _lastDailyQuestGenerationKey, todayDateOnly.toIso8601String());
-      print("Daily quests generated and saved. Next generation tomorrow.");
-      _saveQuests(); // Зберігаємо нові квести
+      if (newDailyQuests.isNotEmpty) {
+        await prefs.setString(
+            _lastDailyQuestGenerationKey, todayDateOnly.toIso8601String());
+        print("Daily quests processing finished.");
+      }
+      _isGeneratingQuest = false;
+      // notifyListeners(); // addQuest вже викликає notifyListeners, тому тут не завжди потрібно,
+      // але якщо були помилки і нічого не додалось, то UI не оновить _isGeneratingQuest
+      // Тому краще викликати для гарантії оновлення стану завантаження.
       notifyListeners();
     }
+  }
+
+  // Метод для отримання запасного щоденного квесту, якщо Gemini не спрацював
+  QuestModel _getFallbackDailyQuest(PlayerModel player, int index) {
+    List<QuestModel> fallbacks = [
+      QuestModel(
+        title: "Ранкова Енергія",
+        description:
+            "Розпочни день з короткої 10-хвилинної зарядки або прогулянки на свіжому повітрі. Це пробудить твою внутрішню силу.",
+        xpReward: 15 + (player.level * 2),
+        difficulty: QuestDifficulty.E,
+        type: QuestType.daily,
+        statRewards: {PlayerStat.stamina: 1},
+      ),
+      QuestModel(
+        title: "Година Концентрації",
+        description:
+            "Присвяти одну годину глибокій роботі над важливим завданням без відволікань. Відточи свій фокус.",
+        xpReward: 25 + (player.level * 3),
+        difficulty: QuestDifficulty.D,
+        type: QuestType.daily,
+        statRewards: {PlayerStat.intelligence: 1},
+      ),
+    ];
+    return fallbacks[index % fallbacks.length];
+  }
+
+  // Метод для генерації одного завдання на вимогу
+  Future<QuestModel?> fetchAndAddGeneratedQuest({
+    required PlayerProvider playerProvider,
+    QuestType questType = QuestType.generated,
+    PlayerStat? targetStat,
+    String? customInstruction,
+  }) async {
+    if (_isGeneratingQuest) return null; // Не генерувати, якщо вже йде процес
+
+    _isGeneratingQuest = true;
+    notifyListeners();
+
+    QuestModel? newQuest = await _geminiService.generateQuest(
+      player: playerProvider.player,
+      questType: questType,
+      targetStat: targetStat,
+      customPromptInstruction: customInstruction,
+    );
+
+    if (newQuest != null) {
+      addQuest(newQuest); // addQuest викличе _saveQuests та notifyListeners
+    } else {
+      print("Failed to generate a new quest using Gemini API.");
+    }
+
+    _isGeneratingQuest = false;
+    // addQuest вже викликав notifyListeners, але якщо newQuest == null, то UI не оновить _isGeneratingQuest
+    notifyListeners();
+    return newQuest;
   }
 
   // Метод для очищення списків квестів (для тестування)
