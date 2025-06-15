@@ -101,7 +101,13 @@ class PlayerProvider with ChangeNotifier {
   // Метод для зміни імені гравця (приклад)
   void setPlayerName(String name) {
     if (_isLoading) return;
-    _player.playerName = name;
+    if (name.trim().isEmpty) {
+      // Додамо перевірку на порожнє ім'я
+      print("Player name cannot be empty.");
+      // Можна тут кинути виняток або повернути false, щоб UI міг це обробити
+      return;
+    }
+    _player.playerName = name.trim(); // .trim() для видалення зайвих пробілів
     _savePlayerData();
     notifyListeners();
   }

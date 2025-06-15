@@ -40,6 +40,66 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     );
   }
 
+  // Функція для показу діалогу редагування імені
+  Future<void> _showEditNameDialog(
+      BuildContext context, PlayerProvider playerProvider) async {
+    final TextEditingController nameController =
+        TextEditingController(text: playerProvider.player.playerName);
+    final formKey = GlobalKey<FormState>(); // Для валідації
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // Користувач має натиснути кнопку
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Змінити ім\'я гравця'),
+          content: SingleChildScrollView(
+            // На випадок, якщо екран малий
+            child: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: nameController,
+                autofocus: true,
+                decoration:
+                    const InputDecoration(hintText: "Введіть нове ім'я"),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Ім\'я не може бути порожнім';
+                  }
+                  if (value.trim().length > 20) {
+                    // Обмеження довжини
+                    return 'Ім\'я занадто довге (макс. 20 символів)';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Скасувати'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Зберегти'),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  playerProvider.setPlayerName(nameController.text.trim());
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Ім\'я гравця оновлено!')),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Використовуємо Selector для перебудови лише при зміні конкретних полів, якщо потрібно оптимізувати
@@ -120,8 +180,21 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: <Widget>[
-            _buildInfoCard('Ім\'я Гравця:', player.playerName),
-            // TODO: Додати можливість змінювати ім'я гравця
+            _buildInfoCard(
+              'Ім\'я Гравця:',
+              player.playerName,
+              actionWidget: IconButton(
+                // Додаємо кнопку редагування
+                icon:
+                    Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
+                tooltip: 'Редагувати ім\'я',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () {
+                  _showEditNameDialog(context, playerProvider);
+                },
+              ),
+            ),
             const SizedBox(height: 16),
             _buildInfoCard('Рівень:', '${player.level}'),
             const SizedBox(height: 8),
@@ -181,22 +254,32 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     );
   }
 
-  Widget _buildInfoCard(String label, String value) {
+  Widget _buildInfoCard(String label, String value, {Widget? actionWidget}) {
     return Card(
       color: const Color(0xFF2A2A2A),
       elevation: 3,
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             Text(label,
                 style: const TextStyle(fontSize: 16, color: Colors.white70)),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
+            Row(
+              // Об'єднуємо значення та екшн-віджет
+              children: [
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+                if (actionWidget != null) ...[
+                  // Якщо є actionWidget
+                  const SizedBox(width: 8),
+                  actionWidget,
+                ]
+              ],
+            )
           ],
         ),
       ),
