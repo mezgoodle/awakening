@@ -112,12 +112,28 @@ class PlayerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Метод для повного скидання прогресу (для тестування)
+  void updateBaselinePerformance(Map<PhysicalActivity, dynamic> performance) {
+    if (_isLoading) return;
+    _player.baselinePhysicalPerformance =
+        Map.from(performance); // Створюємо копію
+    _savePlayerData();
+    notifyListeners();
+  }
+
+  void setInitialSurveyCompleted(bool completed) {
+    if (_isLoading) return;
+    _player.initialSurveyCompleted = completed;
+    _savePlayerData();
+    notifyListeners();
+  }
+
+  // Метод для повного скидання прогресу (для тестування) - ОНОВЛЕНО
   Future<void> resetPlayerData() async {
-    _player = PlayerModel(); // Скидаємо до дефолтного стану
-    _isLoading = false; // Впевнюємося, що не заблоковані
+    _player =
+        PlayerModel(); // Скидаємо до дефолтного стану, включаючи initialSurveyCompleted = false
+    _isLoading = false;
     _justLeveledUp = false;
-    await _savePlayerData(); // Зберігаємо "порожній" стан
+    await _savePlayerData();
     notifyListeners();
     print("Player data has been reset.");
   }

@@ -45,6 +45,49 @@ class GeminiQuestService {
         ? "гравець"
         : player.playerName; // Узагальнення, якщо ім'я дефолтне
 
+    String baselinePerformancePrompt = "";
+    if (player.baselinePhysicalPerformance != null &&
+        player.baselinePhysicalPerformance!.isNotEmpty) {
+      baselinePerformancePrompt +=
+          "\n\nБазові фізичні показники гравця (за результатами самооцінки):";
+      player.baselinePhysicalPerformance!.forEach((activity, value) {
+        String activityName = "";
+        switch (activity) {
+          case PhysicalActivity.pullUps:
+            activityName = "Максимум підтягувань";
+            break;
+          case PhysicalActivity.pushUps:
+            activityName = "Максимум віджимань";
+            break;
+          case PhysicalActivity.runningDurationInMin:
+            activityName = "Тривалість бігу (хв)";
+            break;
+          case PhysicalActivity.regularExercise:
+            activityName = "Регулярно займається спортом";
+            break;
+        }
+        baselinePerformancePrompt += "\n- $activityName: $value";
+      });
+      baselinePerformancePrompt +=
+          "\nВраховуй ці показники при генерації фізичних завдань (на Силу, Спритність, Витривалість), щоб вони були складними, але досяжними. Якщо, наприклад, гравець вказав 0 підтягувань, не давай завдання на підтягування, а запропонуй підготовчі вправи (наприклад, австралійські підтягування, негативні підтягування або вправи для зміцнення спини/рук). Адаптуй кількість повторень/тривалість до цих показників.";
+    }
+
+    // Формування промпту з урахуванням targetStat для щоденних завдань (якщо це Пункт 2)
+    String targetStatFocusPrompt = "";
+    if (targetStat != null) {
+      targetStatFocusPrompt = """
+
+ЗАВДАННЯ СПЕЦІАЛЬНО ДЛЯ РОЗВИТКУ ХАРАКТЕРИСТИКИ: ${PlayerModel.getStatName(targetStat)}.
+ПОТОЧНЕ ЗНАЧЕННЯ ЦІЄЇ ХАРАКТЕРИСТИКИ У ГРАВЦЯ: ${player.stats[targetStat] ?? 'N/A'}.
+Адаптуй складність, опис та тип активності відповідно до цього значення та назви характеристики.
+Наприклад, для Інтелекту це може бути читання, вивчення, розв'язування задач. Для Спритності - вправи на координацію, швидкість.
+Для Сприйняття - завдання на уважність, спостережливість. Для Витривалості - кардіо. Для Сили - силові вправи.
+Якщо значення характеристики низьке (наприклад, 1-5 для статів, які починаються з 5), завдання має бути для початківців.
+Якщо високе (наприклад, 15+), завдання може бути більш просунутим.
+Нагорода XP та складність (Ранг) також мають відображати це.
+""";
+    }
+
     final prompt = """
 Згенеруй ігрове завдання для рольової гри на Android в стилі аніме "Solo Leveling" (Підняття рівня наодинці).
 Завдання має бути реалістичним для виконання в реальному житті, але описане в термінах ігрового світу.
@@ -58,26 +101,26 @@ class GeminiQuestService {
 Інтелект: ${player.stats[PlayerStat.intelligence]}
 Сприйняття: ${player.stats[PlayerStat.perception]}
 Витривалість: ${player.stats[PlayerStat.stamina]}
+$baselinePerformancePrompt
 
 Параметри для генерації завдання:
 Тип завдання: ${QuestModel.getQuestTypeName(questType)}
-${targetStat != null ? 'Завдання має бути сфокусоване на розвитку характеристики: ${PlayerModel.getStatName(targetStat)}.' : 'Завдання може бути загальнорозвиваючим або фокусуватися на будь-якій доступній гравцю характеристиці.'}
 ${customPromptInstruction != null ? '\nДодаткова інструкція: $customPromptInstruction' : ''}
-
+$targetStatFocusPrompt 
 Завдання повинно бути унікальним та цікавим.
 Воно повинно містити:
 1.  Назва (коротка, інтригуюча, в стилі Solo Leveling, 3-5 слів).
 2.  Опис (детальніше, що потрібно зробити гравцю, 2-4 речення. Опис має бути практичним, що гравець може зробити в реальності).
-3.  Ранг складності (F, E, D, C, B, A, S). Ранг має відповідати рівню гравця та опису завдання. Для низьких рівнів гравця (1-10) уникай рангів A, S, якщо це не особливий квест.
+3.  Ранг складності (F, E, D, C, B, A, S). Ранг має відповідати рівню гравця, його характеристикам (особливо якщо є targetStat) та опису завдання.
 4.  Нагорода XP (ціле число). Нагорода має залежати від складності та рівня гравця.
-    Приклади XP для рівня ${player.level}:
+    Приклади XP для рівня ${player.level} (якщо немає фокусної характеристики, або вона середня):
     - Ранг F: ${10 + player.level * 2}-${20 + player.level * 3} XP
     - Ранг E: ${20 + player.level * 3}-${35 + player.level * 4} XP
     - Ранг D: ${35 + player.level * 4}-${50 + player.level * 5} XP
     - Ранг C: ${50 + player.level * 5}-${75 + player.level * 6} XP
-    (для вищих рангів пропорційно більше)
-5.  Нагорода у вигляді очок характеристик (опціонально): об'єкт JSON, де ключ - назва характеристики (strength, agility, intelligence, perception, stamina), а значення - кількість очок (зазвичай 1, рідко 2 для дуже складних завдань). Якщо нагороди в характеристиках немає, цей ключ має бути відсутнім або значенням null.
-6.  Фокусна характеристика (опціонально): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив, якщо це явно випливає з опису. Якщо ні, цей ключ має бути відсутнім або значенням null.
+    Якщо є фокусна характеристика (targetStat) і її значення у гравця високе, XP може бути трохи більшим для відповідного рангу. Якщо низьке - трохи меншим.
+5.  Нагорода у вигляді очок характеристик (опціонально): об'єкт JSON, де ключ - назва характеристики (strength, agility, intelligence, perception, stamina), а значення - кількість очок (зазвичай 1, рідко 2 для дуже складних завдань). Якщо нагороди в характеристиках немає, цей ключ має бути відсутнім або значенням null. Нагорода має відповідати targetStat, якщо він вказаний.
+6.  Фокусна характеристика (опціонально, але ОБОВ'ЯЗКОВО якщо передано targetStat для генерації): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив. Має збігатися з переданим targetStat, якщо він був.
 
 Надай відповідь ТІЛЬКИ у форматі JSON об'єкту з такими полями (використовуй подвійні лапки для ключів та рядкових значень):
 "title": "string",
@@ -85,28 +128,17 @@ ${customPromptInstruction != null ? '\nДодаткова інструкція: 
 "difficulty": "string (F, E, D, C, B, A, S)",
 "xpReward": integer,
 "statRewards": {"stat_name_english": amount, ...} (або null),
-"targetStat": "stat_name_english" (або null)
+"targetStat": "stat_name_english" (або null, але має бути заповнено, якщо завдання генерується для конкретного targetStat)
 
 Приклад бажаного JSON (не копіюй його, це лише приклад структури):
 {
   "title": "Тренування Тіні",
-  "description": "Щоб стати сильнішим, ти повинен відточити свої рухи. Виконай комплекс фізичних вправ: 3 підходи по 15 віджимань та 3 підходи по 20 присідань. Кожен рух має бути чітким, як удар тіні.",
+  "description": "Твій показник віджимань - ${player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] ?? 'невідомий'}. Спробуй виконати 3 підходи по ${((player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] as int? ?? 10) * 0.6).round()} віджимань. Кожен рух має бути чітким.",
   "difficulty": "E",
   "xpReward": 30,
   "statRewards": {"strength": 1, "stamina": 1},
   "targetStat": "strength"
 }
-
-Інший приклад:
-{
-  "title": "Пошук Знань",
-  "description": "Істинна сила не лише в м'язах. Прочитай сьогодні 20 сторінок книги, яка розширює твої горизонти, або вивчи 5 нових слів іноземною мовою. Знання - це теж зброя.",
-  "difficulty": "D",
-  "xpReward": 45,
-  "statRewards": {"intelligence": 1},
-  "targetStat": "intelligence"
-}
-
 Переконайся, що назви характеристик в statRewards та targetStat є одними з: strength, agility, intelligence, perception, stamina.
 Не додавай жодних коментарів або пояснень поза JSON об'єктом. Тільки JSON.
 """;
@@ -187,7 +219,8 @@ ${customPromptInstruction != null ? '\nДодаткова інструкція: 
 
       PlayerStat? parsedTargetStat;
       if (jsonResponse['targetStat'] != null &&
-          jsonResponse['targetStat'] is String) {
+          jsonResponse['targetStat'] is String &&
+          (jsonResponse['targetStat'] as String).isNotEmpty) {
         try {
           parsedTargetStat = PlayerStat.values
               .byName(jsonResponse['targetStat'].toString().toLowerCase());
@@ -205,7 +238,7 @@ ${customPromptInstruction != null ? '\nДодаткова інструкція: 
         difficulty: difficulty,
         type: questType, // Тип, який ми передали для генерації
         statRewards: statRewards,
-        targetStat: parsedTargetStat,
+        targetStat: parsedTargetStat ?? targetStat,
       );
     } catch (e) {
       print("Error generating quest with Gemini API: $e");

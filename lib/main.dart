@@ -6,19 +6,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'providers/quest_provider.dart'; // Імпортуємо QuestProvider
 // import 'screens/player_status_screen.dart'; // Будемо використовувати новий HomeScreen
 import 'screens/home_screen.dart'; // Новий головний екран з навігацією
+import 'screens/initial_survey_screen.dart'; // Імпортуємо екран опитування
+import 'screens/splash_screen.dart'; // Створимо простий сплеш-скрін
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+  final playerProvider = PlayerProvider();
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => PlayerProvider()),
-        // Передаємо PlayerProvider в QuestProvider, якщо він потрібен при створенні.
-        // Але краще передавати його в методи, де він використовується.
-        // Тому ChangeNotifierProxyProvider не потрібен прямо зараз,
-        // PlayerProvider буде доступний через context.read<PlayerProvider>() в QuestProvider методах.
-        // Або передавати як аргумент методу.
+        ChangeNotifierProvider.value(value: playerProvider),
         ChangeNotifierProvider(create: (_) => QuestProvider()),
       ],
       child: const MyApp(),
@@ -31,15 +29,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Спробуємо викликати генерацію щоденних квестів при старті
-    // Краще це робити в якомусь init методі або при першому відкритті екрану квестів.
-    // Для простоти, можна викликати тут, але це не найкраща практика для запуску асинхронних операцій
-    // прямо в build методі MyApp.
-    // Provider.of<QuestProvider>(context, listen: false).generateDailyQuestsIfNeeded(
-    //   Provider.of<PlayerProvider>(context, listen: false)
-    // );
-    // ^^^ Краще винести це в `HomeScreen` в `initState`.
-
     return MaterialApp(
       title: 'Solo Leveling App',
       theme: ThemeData(
@@ -53,6 +42,20 @@ class MyApp extends StatelessWidget {
                 color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
             titleMedium:
                 TextStyle(color: Colors.lightBlue, fontWeight: FontWeight.w600),
+            headlineSmall: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold), // для заголовків
+          ),
+          radioTheme: RadioThemeData(
+            // Стилізація радіокнопок
+            fillColor: WidgetStateProperty.resolveWith<Color>(
+                (Set<WidgetState> states) {
+              if (states.contains(WidgetState.selected)) {
+                return Colors.lightBlueAccent;
+              }
+              return Colors.grey[600]!;
+            }),
+            // visualDensity: VisualDensity.compact, // Можна зробити компактнішими
           ),
           progressIndicatorTheme: const ProgressIndicatorThemeData(
             color: Colors.lightBlueAccent,
@@ -81,6 +84,10 @@ class MyApp extends StatelessWidget {
                   const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
+          textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                  foregroundColor: Colors.lightBlueAccent,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w600))),
           bottomNavigationBarTheme: BottomNavigationBarThemeData(
             // Стилізація BottomNavigationBar
             backgroundColor: const Color(0xFF1F1F1F),
@@ -88,8 +95,7 @@ class MyApp extends StatelessWidget {
             unselectedItemColor: Colors.grey[600],
             selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
           )),
-      // home: const PlayerStatusScreen(), // Замінюємо на HomeScreen
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
