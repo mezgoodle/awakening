@@ -1,6 +1,7 @@
 // lib/models/player_model.dart
 import 'dart:math';
 import 'package:flutter/foundation.dart'; // для @required, якщо потрібно, або просто для ChangeNotifier пізніше
+import 'quest_model.dart';
 
 // Перелік для можливих характеристик
 enum PlayerStat {
@@ -28,6 +29,7 @@ class PlayerModel {
       baselinePhysicalPerformance; // dynamic, бо може бути int або bool
   bool initialSurveyCompleted;
   int availableStatPoints; // Очки для розподілу при підвищенні рівня
+  late QuestDifficulty playerRank; // Додаємо ранг гравця
 
   PlayerModel({
     this.playerName = "Hunter",
@@ -48,7 +50,25 @@ class PlayerModel {
                   PlayerStat.perception: 5,
                   PlayerStat.stamina: 5,
                 },
-        xpToNextLevel = initialXpToNextLevel ?? calculateXpForLevel(1);
+        xpToNextLevel = initialXpToNextLevel ?? calculateXpForLevel(1) {
+    playerRank =
+        _calculatePlayerRank(level); // Ініціалізуємо ранг при створенні
+  }
+
+  // Метод для розрахунку рангу гравця на основі рівня
+  static QuestDifficulty _calculatePlayerRank(int level) {
+    if (level <= 5) return QuestDifficulty.F; // Додали F-ранг для початківців
+    if (level <= 10) return QuestDifficulty.E;
+    if (level <= 20) return QuestDifficulty.D;
+    if (level <= 30) return QuestDifficulty.C;
+    if (level <= 40) return QuestDifficulty.B;
+    if (level <= 50) return QuestDifficulty.A;
+    return QuestDifficulty.S;
+  }
+
+  void updateRank() {
+    playerRank = _calculatePlayerRank(level);
+  }
 
   static int calculateXpForLevel(int level) {
     if (level <= 0) return 100; // Базове значення для невалідних рівнів
@@ -90,6 +110,7 @@ class PlayerModel {
             MapEntry(key.name, value), // Зберігаємо enum ключ як рядок
       ),
       'initialSurveyCompleted': initialSurveyCompleted,
+      'playerRank': playerRank.name, // Зберігаємо як рядок
     };
   }
 
@@ -127,9 +148,12 @@ class PlayerModel {
       if (loadedBaselinePerformance.isEmpty) loadedBaselinePerformance = null;
     }
 
+    int loadedLevel =
+        json['level'] as int; // Отримуємо рівень для розрахунку рангу
+
     return PlayerModel(
       playerName: json['playerName'] as String? ?? "Мисливець",
-      level: json['level'] as int,
+      level: loadedLevel,
       xp: json['xp'] as int,
       initialXpToNextLevel: json['xpToNextLevel']
           as int, // Передаємо як initial, бо конструктор сам розрахує

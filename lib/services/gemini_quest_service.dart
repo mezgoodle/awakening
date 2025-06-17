@@ -44,6 +44,8 @@ class GeminiQuestService {
     final playerName = player.playerName == "Мисливець"
         ? "гравець"
         : player.playerName; // Узагальнення, якщо ім'я дефолтне
+    final playerRankName = QuestModel.getQuestDifficultyName(
+        player.playerRank); // Отримуємо назву рангу
 
     String baselinePerformancePrompt = "";
     if (player.baselinePhysicalPerformance != null &&
@@ -96,6 +98,7 @@ class GeminiQuestService {
 Інформація про гравця:
 Ім'я: $playerName
 Рівень: ${player.level}
+Ранг Мисливця: $playerRankName 
 Сила: ${player.stats[PlayerStat.strength]}
 Спритність: ${player.stats[PlayerStat.agility]}
 Інтелект: ${player.stats[PlayerStat.intelligence]}
@@ -111,13 +114,13 @@ $targetStatFocusPrompt
 Воно повинно містити:
 1.  Назва (коротка, інтригуюча, в стилі Solo Leveling, 3-5 слів).
 2.  Опис (детальніше, що потрібно зробити гравцю, 2-4 речення. Опис має бути практичним, що гравець може зробити в реальності).
-3.  Ранг складності (F, E, D, C, B, A, S). Ранг має відповідати рівню гравця, його характеристикам (особливо якщо є targetStat) та опису завдання.
-4.  Нагорода XP (ціле число). Нагорода має залежати від складності та рівня гравця.
-    Приклади XP для рівня ${player.level} (якщо немає фокусної характеристики, або вона середня):
-    - Ранг F: ${10 + player.level * 2}-${20 + player.level * 3} XP
-    - Ранг E: ${20 + player.level * 3}-${35 + player.level * 4} XP
-    - Ранг D: ${35 + player.level * 4}-${50 + player.level * 5} XP
-    - Ранг C: ${50 + player.level * 5}-${75 + player.level * 6} XP
+3.  Ранг складності (F, E, D, C, B, A, S). Цей ранг має ВІДПОВІДАТИ $playerRankName рангу гравця.
+4.  Нагорода XP (ціле число). Адаптуй до рівня гравця та рангу завдання.
+    Приклади XP для рівня ${player.level} та рангу $playerRankName:
+    - Ранг F: ${10 + player.level * 2}-${20 + player.level * 3} XP (якщо гравець F рангу)
+    - Ранг E: ${20 + player.level * 3}-${35 + player.level * 4} XP (якщо гравець E рангу)
+    - Ранг D: ${35 + player.level * 4}-${50 + player.level * 5} XP (якщо гравець D рангу)
+    - Ранг C: ${50 + player.level * 5}-${75 + player.level * 6} XP (якщо гравець C рангу)
     Якщо є фокусна характеристика (targetStat) і її значення у гравця високе, XP може бути трохи більшим для відповідного рангу. Якщо низьке - трохи меншим.
 5.  Нагорода у вигляді очок характеристик (опціонально): об'єкт JSON, де ключ - назва характеристики (strength, agility, intelligence, perception, stamina), а значення - кількість очок (зазвичай 1, рідко 2 для дуже складних завдань). Якщо нагороди в характеристиках немає, цей ключ має бути відсутнім або значенням null. Нагорода має відповідати targetStat, якщо він вказаний.
 6.  Фокусна характеристика (опціонально, але ОБОВ'ЯЗКОВО якщо передано targetStat для генерації): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив. Має збігатися з переданим targetStat, якщо він був.
@@ -184,14 +187,20 @@ $targetStatFocusPrompt
       }
 
       QuestDifficulty difficulty;
-      try {
-        difficulty = QuestDifficulty.values
-            .byName(jsonResponse['difficulty'].toString().toUpperCase());
-      } catch (e) {
+      if (jsonResponse['difficulty'] != null) {
+        try {
+          difficulty = QuestDifficulty.values
+              .byName(jsonResponse['difficulty'].toString().toUpperCase());
+        } catch (e) {
+          print(
+              "Gemini API: Invalid difficulty value: ${jsonResponse['difficulty']}. Defaulting to player rank: ${player.playerRank.name}.");
+          difficulty = player
+              .playerRank; // Якщо Gemini помилився з рангом, ставимо ранг гравця
+        }
+      } else {
         print(
-            "Gemini API: Invalid difficulty value: ${jsonResponse['difficulty']}. Defaulting to E.");
-        difficulty = QuestDifficulty
-            .E; // Дефолтне значення, якщо API повернуло невалідний ранг
+            "Gemini API: No difficulty provided. Defaulting to player rank: ${player.playerRank.name}.");
+        difficulty = player.playerRank; // Якщо Gemini не надав ранг
       }
 
       Map<PlayerStat, int>? statRewards;

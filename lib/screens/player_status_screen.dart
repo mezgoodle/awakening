@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
 import '../models/player_model.dart';
+import '../models/quest_model.dart'; // Для QuestDifficulty
 
 class PlayerStatusScreen extends StatefulWidget {
   const PlayerStatusScreen({super.key});
@@ -98,6 +99,28 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
         );
       },
     );
+  }
+
+  // Додамо метод для отримання кольору рангу, схожий на той, що в QuestCard
+  Color _getRankColor(QuestDifficulty difficulty, BuildContext context) {
+    // Можна винести цю логіку в утиліту або в QuestModel, якщо вона використовується в багатьох місцях
+    switch (difficulty) {
+      case QuestDifficulty.S:
+        return Colors.redAccent[700]!;
+      case QuestDifficulty.A:
+        return Colors.orangeAccent[700]!;
+      case QuestDifficulty.B:
+        return Colors.yellowAccent[700]!;
+      case QuestDifficulty.C:
+        return Colors.lightGreenAccent[700]!;
+      case QuestDifficulty.D:
+        return Colors.lightBlueAccent[400]!;
+      case QuestDifficulty.E:
+        return Colors.grey[500]!;
+      case QuestDifficulty.F:
+      default:
+        return Colors.grey[700]!;
+    }
   }
 
   @override
@@ -196,6 +219,39 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            Card(
+              color: const Color(0xFF2A2A2A),
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    const Text("Ранг Мисливця:",
+                        style: TextStyle(fontSize: 16, color: Colors.white70)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                          color: _getRankColor(player.playerRank, context)
+                              .withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(
+                              color: _getRankColor(player.playerRank, context),
+                              width: 1.5)),
+                      child: Text(
+                        QuestModel.getQuestDifficultyName(player
+                            .playerRank), // Використовуємо той самий метод
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _getRankColor(player.playerRank, context)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             _buildInfoCard('Рівень:', '${player.level}'),
             const SizedBox(height: 8),
             Text(

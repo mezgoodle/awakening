@@ -3,6 +3,7 @@ import 'dart:convert'; // Для jsonEncode/Decode
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/player_model.dart';
+import '../models/quest_model.dart'; // Для QuestDifficulty
 
 class PlayerProvider with ChangeNotifier {
   late PlayerModel _player; // Зробимо late, бо будемо завантажувати асинхронно
@@ -65,13 +66,20 @@ class PlayerProvider with ChangeNotifier {
 
     _player.xp += amount;
     print("Added $amount XP. Total XP: ${_player.xp}/${_player.xpToNextLevel}");
+    bool previousLevelUpState = _justLeveledUp; // Зберігаємо попередній стан
     _checkLevelUp();
     _savePlayerData(); // Зберігаємо після змін
-    notifyListeners();
+    if (_justLeveledUp && !previousLevelUpState) {
+      notifyListeners(); // Якщо _justLeveledUp щойно змінився
+    } else if (!_justLeveledUp && !previousLevelUpState && amount > 0) {
+      // Якщо XP додано, але рівня не було, все одно оновити XP бар
+      notifyListeners();
+    }
   }
 
   void _checkLevelUp() {
     bool leveledUpThisCheck = false;
+    QuestDifficulty oldRank = _player.playerRank; // Зберігаємо старий ранг
     while (_player.xp >= _player.xpToNextLevel) {
       _player.xp -= _player.xpToNextLevel;
       _player.level++;
@@ -82,7 +90,12 @@ class PlayerProvider with ChangeNotifier {
           "LEVEL UP! New level: ${_player.level}. XP for next: ${_player.xpToNextLevel}. Points: ${_player.availableStatPoints}");
     }
     if (leveledUpThisCheck) {
-      _justLeveledUp = true; // Встановлюємо прапорець
+      _justLeveledUp = true;
+      _player.updateRank(); // Оновлюємо ранг гравця
+      if (_player.playerRank != oldRank) {
+        print("RANK UP! New rank: ${_player.playerRank.name}");
+        // Тут можна буде додати системне повідомлення про підвищення рангу
+      }
     }
   }
 
