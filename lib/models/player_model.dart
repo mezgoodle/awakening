@@ -20,39 +20,35 @@ enum PhysicalActivity {
 }
 
 class PlayerModel {
-  String playerName = "Hunter";
+  String playerName;
   int level;
   int xp;
-  int xpToNextLevel;
-  Map<PlayerStat, int> stats; // Використовуємо PlayerStat як ключ
-  Map<PhysicalActivity, dynamic>?
-      baselinePhysicalPerformance; // dynamic, бо може бути int або bool
+  late int xpToNextLevel;
+  Map<PlayerStat, int> stats; // Ось ці стат-и ми будемо змінювати
+  int availableStatPoints;
+  Map<PhysicalActivity, dynamic>? baselinePhysicalPerformance;
   bool initialSurveyCompleted;
-  int availableStatPoints; // Очки для розподілу при підвищенні рівня
-  late QuestDifficulty playerRank; // Додаємо ранг гравця
+  late QuestDifficulty playerRank;
 
   PlayerModel({
-    this.playerName = "Hunter",
-    this.level = 1,
+    this.playerName = "Мисливець",
+    this.level = 1, // Завжди починаємо з 1-го рівня
     this.xp = 0,
-    int? initialXpToNextLevel,
-    Map<PlayerStat, int>? initialStats, // Дозволяємо передати початкові стат-и
-    this.availableStatPoints = 0,
-    this.baselinePhysicalPerformance, // Ініціалізуємо як null
-    this.initialSurveyCompleted =
-        false, // За замовчуванням опитування не пройдено
-  })  : stats =
-            initialStats ?? // Якщо initialStats не передано, встановлюємо по дефолту
+    Map<PlayerStat, int>? initialStats, // Дозволяємо передати для оновлення
+    this.availableStatPoints = 0, // Початкові очки за замовчуванням 0
+    this.baselinePhysicalPerformance,
+    this.initialSurveyCompleted = false,
+  }) : stats =
+            initialStats ?? // Якщо initialStats передано, використовуємо їх, інакше дефолтні
                 {
                   PlayerStat.strength: 5,
                   PlayerStat.agility: 5,
                   PlayerStat.intelligence: 5,
                   PlayerStat.perception: 5,
                   PlayerStat.stamina: 5,
-                },
-        xpToNextLevel = initialXpToNextLevel ?? calculateXpForLevel(1) {
-    playerRank =
-        _calculatePlayerRank(level); // Ініціалізуємо ранг при створенні
+                } {
+    xpToNextLevel = calculateXpForLevel(level); // Розраховуємо для 1-го рівня
+    playerRank = _calculatePlayerRank(level); // Розраховуємо для 1-го рівня
   }
 
   // Метод для розрахунку рангу гравця на основі рівня
@@ -155,8 +151,6 @@ class PlayerModel {
       playerName: json['playerName'] as String? ?? "Мисливець",
       level: loadedLevel,
       xp: json['xp'] as int,
-      initialXpToNextLevel: json['xpToNextLevel']
-          as int, // Передаємо як initial, бо конструктор сам розрахує
       initialStats: loadedStats,
       availableStatPoints: json['availableStatPoints'] as int,
       baselinePhysicalPerformance: loadedBaselinePerformance,

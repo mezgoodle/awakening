@@ -71,8 +71,38 @@ class _InitialSurveyScreenState extends State<InitialSurveyScreen> {
     performance[PhysicalActivity.regularExercise] =
         _regularExercise!; // Тепер ми знаємо, що він не null
 
+    // Розрахунок бонусів до початкових характеристик
+    Map<PlayerStat, int> statBonuses = {};
+
+    if (_regularExercise == true) {
+      statBonuses[PlayerStat.stamina] =
+          (statBonuses[PlayerStat.stamina] ?? 0) + 1;
+      statBonuses[PlayerStat.strength] =
+          (statBonuses[PlayerStat.strength] ?? 0) + 1;
+    }
+
+    int pullUps = performance[PhysicalActivity.pullUps] as int;
+    int pushUps = performance[PhysicalActivity.pushUps] as int;
+
+    if (pullUps >= 3) {
+      // Якщо може підтягнутися хоча б 3 рази
+      statBonuses[PlayerStat.strength] =
+          (statBonuses[PlayerStat.strength] ?? 0) + 1;
+    }
+    if (pushUps >= 10) {
+      // Якщо може віджатися 10+ разів
+      statBonuses[PlayerStat.strength] =
+          (statBonuses[PlayerStat.strength] ?? 0) + 1;
+      statBonuses[PlayerStat.stamina] =
+          (statBonuses[PlayerStat.stamina] ?? 0) + 1;
+    }
+    // Максимальний бонус для кожної характеристики, наприклад, +2
+    statBonuses.updateAll((key, value) => value.clamp(0, 2));
+
     final playerProvider = context.read<PlayerProvider>();
     playerProvider.updateBaselinePerformance(performance);
+    // Застосовуємо бонуси до характеристик
+    playerProvider.applyInitialStatBonuses(statBonuses);
     playerProvider.setInitialSurveyCompleted(true);
 
     Navigator.of(context).pushReplacement(
