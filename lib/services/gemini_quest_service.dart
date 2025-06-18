@@ -12,19 +12,13 @@ class GeminiQuestService {
       : _model = GenerativeModel(
             model: 'gemini-1.5-flash-latest',
             apiKey: dotenv.env['GEMINI_API_KEY']!,
-            // Налаштування безпеки можна залишити за замовчуванням або налаштувати
-            // Тут ми дозволяємо всі категорії, але з низьким порогом для блокування,
-            // щоб уникнути надто суворих обмежень для ігрового контенту,
-            // але це потрібно тестувати. Для деяких тем (насилля в грі) може знадобитися
-            // більш тонке налаштування або менш суворі обмеження.
-            // SafetySettings для прикладу, можна почати без них, щоб побачити дефолтну поведінку.
             safetySettings: [
-              SafetySetting(HarmCategory.harassment, HarmBlockThreshold.medium),
-              SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.medium),
+              SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
+              SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.high),
               SafetySetting(
-                  HarmCategory.sexuallyExplicit, HarmBlockThreshold.medium),
+                  HarmCategory.sexuallyExplicit, HarmBlockThreshold.high),
               SafetySetting(
-                  HarmCategory.dangerousContent, HarmBlockThreshold.medium),
+                  HarmCategory.dangerousContent, HarmBlockThreshold.high),
             ],
             generationConfig: GenerationConfig(
               // temperature: 0.7, // 0.0 - 1.0. Більше значення -> більш креативно, менше -> більш детерміновано
