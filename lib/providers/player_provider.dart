@@ -133,6 +133,29 @@ class PlayerProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Метод для застосування бонусів до початкових характеристик
+  void applyInitialStatBonuses(Map<PlayerStat, int> bonuses) {
+    if (_isLoading) return;
+    if (_player.initialSurveyCompleted) {
+      // Застосовуємо бонуси тільки один раз
+      print(
+          "Initial stat bonuses already applied or survey not marked as completed yet for this logic.");
+      return;
+    }
+
+    bonuses.forEach((stat, bonusAmount) {
+      if (bonusAmount > 0) {
+        _player.stats[stat] = (_player.stats[stat] ?? 0) + bonusAmount;
+        print(
+            "Applied +$bonusAmount bonus to ${PlayerModel.getStatName(stat)} from survey.");
+      }
+    });
+    // _savePlayerData() буде викликаний в setInitialSurveyCompleted(true)
+    // або можна викликати тут, якщо setInitialSurveyCompleted не викликається одразу після
+    // Але в нашому випадку викликається, тому можна не дублювати.
+    notifyListeners(); // Повідомити про зміну статів
+  }
+
   void setInitialSurveyCompleted(bool completed) {
     if (_isLoading) return;
     _player.initialSurveyCompleted = completed;

@@ -1,11 +1,10 @@
-// lib/providers/quest_provider.dart
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quest_model.dart';
-import '../models/player_model.dart'; // Для PlayerStat, PlayerProvider не потрібен прямо тут
-import 'player_provider.dart'; // Потрібен для нарахування нагород
-import '../services/gemini_quest_service.dart'; // Імпортуємо наш сервіс
+import '../models/player_model.dart';
+import 'player_provider.dart';
+import '../services/gemini_quest_service.dart';
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
@@ -123,8 +122,6 @@ class QuestProvider with ChangeNotifier {
     }
   }
 
-  // Метод для генерації щоденних квестів (поки що хардкод)
-  // PlayerProvider потрібен, щоб адаптувати складність/нагороди під рівень гравця в майбутньому
   Future<void> generateDailyQuestsIfNeeded(
       PlayerProvider playerProvider) async {
     final prefs = await SharedPreferences.getInstance();
@@ -138,13 +135,18 @@ class QuestProvider with ChangeNotifier {
       final lastGenerationDate = DateTime.parse(lastGenerationDateStr);
       if (lastGenerationDate == todayDateOnly &&
           _activeQuests.any((q) => q.type == QuestType.daily)) {
-        // Додаткова перевірка, чи є вже щоденні
         shouldGenerate = false;
         print("Daily quests already exist or generated today.");
       }
     }
 
     if (shouldGenerate) {
+      if (playerProvider.isLoading) {
+        print(
+            "Player data is still loading. Skipping daily quest generation for now.");
+        return;
+      }
+
       print(
           "Generating daily quests for ${todayDateOnly.toIso8601String()}...");
       _activeQuests.removeWhere(
@@ -154,31 +156,60 @@ class QuestProvider with ChangeNotifier {
       notifyListeners(); // Повідомити UI про початок генерації
 
       List<QuestModel> newDailyQuests = [];
-      // Спробуємо згенерувати 2-3 щоденних завдання через Gemini
-      // Можна додати різні targetStat для різноманітності
-      List<PlayerStat?> dailyTargets = [
-        PlayerStat.stamina,
-        PlayerStat.intelligence,
-        null
-      ]; // null для загального
+      PlayerModel currentPlayer = playerProvider.player;
 
-      for (int i = 0; i < 2; i++) {
-        // Згенеруємо 2 щоденних
+      // Генеруємо по одному завданню для кожної основної характеристики
+      for (PlayerStat stat in PlayerStat.values) {
+        print(
+            "Attempting to generate daily quest for ${PlayerModel.getStatName(stat)}...");
         QuestModel? generatedQuest = await _geminiService.generateQuest(
-            player: playerProvider.player,
-            questType: QuestType.daily,
-            targetStat: dailyTargets[i % dailyTargets.length], // Чергуємо цілі
-            customPromptInstruction:
-                "Це має бути завдання, яке можна виконувати щодня для підтримки форми або розвитку навичок.");
+          player: currentPlayer,
+          questType: QuestType.daily,
+          targetStat: stat, // Вказуємо цільову характеристику
+          // customPromptInstruction: "Це щоденне завдання для підтримки та розвитку ${PlayerModel.getStatName(stat)}." // Можна додати для ясності Gemini
+        );
+
         if (generatedQuest != null) {
-          newDailyQuests.add(generatedQuest);
+          // Перевірка, чи Gemini правильно встановив targetStat
+          if (generatedQuest.targetStat != stat &&
+              generatedQuest.targetStat != null) {
+            print(
+                "Warning: Gemini generated quest for ${PlayerModel.getStatName(generatedQuest.targetStat!)} instead of ${PlayerModel.getStatName(stat)}. Using fallback.");
+            newDailyQuests
+                .add(_getFallbackDailyQuestForStat(stat, currentPlayer));
+          } else if (generatedQuest.targetStat == null &&
+              generatedQuest.type == QuestType.daily) {
+            // Якщо Gemini не вказав targetStat для щоденного, можливо, він не зрозумів фокус
+            // Хоча наш промпт тепер сильніше на це вказує
+            print(
+                "Warning: Gemini daily quest has no targetStat for ${PlayerModel.getStatName(stat)}. Adjusting or using fallback.");
+            // Спробуємо "виправити" або використати fallback
+            // Для простоти, поки що використовуємо fallback, якщо targetStat не встановлено або не той
+            QuestModel correctedQuest = QuestModel(
+                id: generatedQuest.id, // Зберігаємо ID, якщо є
+                title: generatedQuest.title,
+                description: generatedQuest.description,
+                xpReward: generatedQuest.xpReward,
+                statRewards: generatedQuest.statRewards ??
+                    {stat: 1}, // Гарантуємо нагороду за цільовий стат
+                type: QuestType.daily,
+                difficulty: generatedQuest.difficulty,
+                targetStat:
+                    stat, // Примусово встановлюємо правильний targetStat
+                createdAt: generatedQuest.createdAt);
+            newDailyQuests.add(correctedQuest);
+          } else {
+            newDailyQuests.add(generatedQuest);
+          }
         } else {
-          // Якщо Gemini не зміг, додамо хардкодний варіант
-          print("Gemini failed to generate daily quest, adding fallback.");
-          newDailyQuests.add(_getFallbackDailyQuest(playerProvider.player, i));
+          print(
+              "Gemini failed to generate daily quest for ${PlayerModel.getStatName(stat)}, using fallback.");
+          newDailyQuests
+              .add(_getFallbackDailyQuestForStat(stat, currentPlayer));
         }
       }
 
+      int addedQuestCount = 0;
       for (var quest in newDailyQuests) {
         // Перевіряємо, чи квест з таким самим заголовком (для уникнення дублів щоденних)
         // вже існує серед активних або виконаних СЬОГОДНІ
@@ -194,45 +225,100 @@ class QuestProvider with ChangeNotifier {
         if (!alreadyExistsToday) {
           addQuest(
               quest); // addQuest вже викликає _saveQuests і notifyListeners
+          addedQuestCount++;
         }
       }
 
-      if (newDailyQuests.isNotEmpty) {
+      if (addedQuestCount > 0) {
+        // Зберігаємо дату, тільки якщо хоча б один квест було додано
         await prefs.setString(
             _lastDailyQuestGenerationKey, todayDateOnly.toIso8601String());
-        print("Daily quests processing finished.");
+        print(
+            "$addedQuestCount daily quests processed and saved. Next generation tomorrow.");
+      } else {
+        print(
+            "No new daily quests were added (possibly all duplicates or generation failed).");
       }
+
       _isGeneratingQuest = false;
-      // notifyListeners(); // addQuest вже викликає notifyListeners, тому тут не завжди потрібно,
-      // але якщо були помилки і нічого не додалось, то UI не оновить _isGeneratingQuest
-      // Тому краще викликати для гарантії оновлення стану завантаження.
-      notifyListeners();
+      notifyListeners(); // Повідомити UI про завершення генерації
     }
   }
 
-  // Метод для отримання запасного щоденного квесту, якщо Gemini не спрацював
-  QuestModel _getFallbackDailyQuest(PlayerModel player, int index) {
-    List<QuestModel> fallbacks = [
-      QuestModel(
-        title: "Ранкова Енергія",
-        description:
-            "Розпочни день з короткої 10-хвилинної зарядки або прогулянки на свіжому повітрі. Це пробудить твою внутрішню силу.",
-        xpReward: 15 + (player.level * 2),
-        difficulty: QuestDifficulty.E,
-        type: QuestType.daily,
-        statRewards: {PlayerStat.stamina: 1},
-      ),
-      QuestModel(
-        title: "Година Концентрації",
-        description:
-            "Присвяти одну годину глибокій роботі над важливим завданням без відволікань. Відточи свій фокус.",
-        xpReward: 25 + (player.level * 3),
-        difficulty: QuestDifficulty.D,
-        type: QuestType.daily,
-        statRewards: {PlayerStat.intelligence: 1},
-      ),
-    ];
-    return fallbacks[index % fallbacks.length];
+  // Метод для отримання запасного щоденного квесту для конкретної характеристики
+  QuestModel _getFallbackDailyQuestForStat(
+      PlayerStat stat, PlayerModel player) {
+    int xpBase = 15 + (player.level * 2);
+    Map<PlayerStat, int> defaultStatReward = {stat: 1};
+
+    switch (stat) {
+      case PlayerStat.strength:
+        return QuestModel(
+          title: "Щоденна Сила",
+          description:
+              "Виконай 2 підходи по ${(player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] as int? ?? 10) ~/ 2 + 3} віджимань та ${(player.baselinePhysicalPerformance?[PhysicalActivity.pullUps] as int? ?? 2) ~/ 2 + 1} підтягувань (або австралійських).",
+          xpReward: xpBase + 5,
+          difficulty: QuestDifficulty.E,
+          type: QuestType.daily,
+          statRewards: defaultStatReward,
+          targetStat: stat,
+        );
+      case PlayerStat.agility:
+        return QuestModel(
+          title: "Ранкова Гнучкість",
+          description:
+              "Присвяти 10 хвилин розтяжці основних груп м'язів або виконай комплекс вправ на координацію.",
+          xpReward: xpBase,
+          difficulty: QuestDifficulty.E,
+          type: QuestType.daily,
+          statRewards: defaultStatReward,
+          targetStat: stat,
+        );
+      case PlayerStat.intelligence:
+        return QuestModel(
+          title: "Ментальна Зарядка",
+          description:
+              "Прочитай 10 сторінок книги, що розвиває, або розв'яжи 2-3 логічні задачі/головоломки.",
+          xpReward: xpBase,
+          difficulty: QuestDifficulty.D,
+          type: QuestType.daily,
+          statRewards: defaultStatReward,
+          targetStat: stat,
+        );
+      case PlayerStat.perception:
+        return QuestModel(
+          title: "Око Мисливця",
+          description:
+              "Під час прогулянки або поїздки, спробуй помітити 5 дрібних деталей, на які раніше не звертав уваги. Запиши їх.",
+          xpReward: xpBase - 5 > 0 ? xpBase - 5 : 5,
+          difficulty: QuestDifficulty.D,
+          type: QuestType.daily,
+          statRewards: defaultStatReward,
+          targetStat: stat,
+        );
+      case PlayerStat.stamina:
+        return QuestModel(
+          title: "Витривалість Тіні",
+          description:
+              "Здійсни ${(player.baselinePhysicalPerformance?[PhysicalActivity.runningDurationInMin] as int? ?? 10) ~/ 2 + 5}-хвилинну пробіжку в помірному темпі або швидку ходьбу.",
+          xpReward: xpBase + 5,
+          difficulty: QuestDifficulty.E,
+          type: QuestType.daily,
+          statRewards: defaultStatReward,
+          targetStat: stat,
+        );
+      default: // На випадок, якщо додадуться нові стати
+        return QuestModel(
+          title: "Щоденний Розвиток",
+          description:
+              "Присвяти 15 хвилин будь-якій активності, що покращує тебе.",
+          xpReward: xpBase,
+          difficulty: QuestDifficulty.E,
+          type: QuestType.daily,
+          statRewards: defaultStatReward,
+          targetStat: stat,
+        );
+    }
   }
 
   // Метод для генерації одного завдання на вимогу
