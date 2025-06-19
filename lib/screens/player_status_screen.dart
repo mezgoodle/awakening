@@ -1,4 +1,5 @@
 // lib/screens/player_status_screen.dart
+import 'package:awakening/providers/system_log_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
@@ -282,13 +283,14 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               ),
             const SizedBox(height: 8),
             ...player.stats.entries.map((entry) {
+              final slog = context.read<SystemLogProvider>();
               return _buildStatRow(
                 PlayerModel.getStatName(entry.key),
                 entry.value,
                 context,
                 canIncrease: player.availableStatPoints > 0,
                 onIncrease: () {
-                  playerProvider.increaseStat(entry.key, 1);
+                  playerProvider.increaseStat(entry.key, 1, slog);
                 },
               );
             }).toList(),
@@ -300,7 +302,8 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 foregroundColor: Colors.black,
               ),
               onPressed: () {
-                playerProvider.addXp(50); // Додаємо 50 XP для тесту
+                final slog = context.read<SystemLogProvider>();
+                playerProvider.addXp(50, slog); // Додаємо 50 XP для тесту
               },
               child: const Text('Додати 50 XP (Тест)'),
             ),

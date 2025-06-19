@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'package:awakening/models/system_message_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quest_model.dart';
 import '../models/player_model.dart';
 import 'player_provider.dart';
 import '../services/gemini_quest_service.dart';
+import 'system_log_provider.dart';
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
@@ -97,22 +99,26 @@ class QuestProvider with ChangeNotifier {
     }
   }
 
-  void completeQuest(String questId, PlayerProvider playerProvider) {
+  void completeQuest(
+      String questId, PlayerProvider playerProvider, SystemLogProvider slog) {
     final questIndex = _activeQuests.indexWhere((q) => q.id == questId);
     if (questIndex != -1) {
       QuestModel quest = _activeQuests[questIndex];
 
       // Нараховуємо нагороди
-      playerProvider.addXp(quest.xpReward);
+      playerProvider.addXp(quest.xpReward, slog);
       if (quest.statRewards != null) {
         quest.statRewards!.forEach((stat, amount) {
-          playerProvider.increaseStat(stat, amount);
+          playerProvider.increaseStat(stat, amount, slog);
         });
       }
 
       // Позначаємо як виконаний і переміщуємо
       quest.isCompleted = true;
       quest.completedAt = DateTime.now();
+      slog.addMessage(
+          "Завдання '${quest.title}' виконано! Нагорода: ${quest.xpReward} XP.",
+          MessageType.questCompleted);
       _completedQuests.add(quest);
       _activeQuests.removeAt(questIndex);
 
@@ -123,7 +129,7 @@ class QuestProvider with ChangeNotifier {
   }
 
   Future<void> generateDailyQuestsIfNeeded(
-      PlayerProvider playerProvider) async {
+      PlayerProvider playerProvider, SystemLogProvider slog) async {
     final prefs = await SharedPreferences.getInstance();
     final String? lastGenerationDateStr =
         prefs.getString(_lastDailyQuestGenerationKey);
@@ -177,12 +183,19 @@ class QuestProvider with ChangeNotifier {
                 "Warning: Gemini generated quest for ${PlayerModel.getStatName(generatedQuest.targetStat!)} instead of ${PlayerModel.getStatName(stat)}. Using fallback.");
             newDailyQuests
                 .add(_getFallbackDailyQuestForStat(stat, currentPlayer));
+            slog.addMessage("Нове щоденне завдання: '${generatedQuest.title}'",
+                MessageType.questAdded,
+                showInSnackbar: false);
           } else if (generatedQuest.targetStat == null &&
               generatedQuest.type == QuestType.daily) {
             // Якщо Gemini не вказав targetStat для щоденного, можливо, він не зрозумів фокус
             // Хоча наш промпт тепер сильніше на це вказує
             print(
                 "Warning: Gemini daily quest has no targetStat for ${PlayerModel.getStatName(stat)}. Adjusting or using fallback.");
+            slog.addMessage(
+                "Невдала генерація щоденного для $stat, використано резерв.",
+                MessageType.warning,
+                showInSnackbar: false);
             // Спробуємо "виправити" або використати fallback
             // Для простоти, поки що використовуємо fallback, якщо targetStat не встановлено або не той
             QuestModel correctedQuest = QuestModel(
@@ -324,6 +337,7 @@ class QuestProvider with ChangeNotifier {
   // Метод для генерації одного завдання на вимогу
   Future<QuestModel?> fetchAndAddGeneratedQuest({
     required PlayerProvider playerProvider,
+    required SystemLogProvider slog,
     QuestType questType = QuestType.generated,
     PlayerStat? targetStat,
     String? customInstruction,
@@ -342,8 +356,11 @@ class QuestProvider with ChangeNotifier {
 
     if (newQuest != null) {
       addQuest(newQuest); // addQuest викличе _saveQuests та notifyListeners
+      slog.addMessage("Нове завдання: '${newQuest.title}' згенеровано!",
+          MessageType.questAdded);
     } else {
       print("Failed to generate a new quest using Gemini API.");
+      slog.addMessage("Не вдалося згенерувати завдання.", MessageType.error);
     }
 
     _isGeneratingQuest = false;

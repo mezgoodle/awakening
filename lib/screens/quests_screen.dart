@@ -1,5 +1,6 @@
 // lib/screens/quests_screen.dart
 import 'package:awakening/models/player_model.dart';
+import 'package:awakening/providers/system_log_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/quest_provider.dart';
@@ -161,12 +162,14 @@ class _QuestsScreenState extends State<QuestsScreen>
             Text('Генерація завдання через Gemini...')
           ])),
     );
+    final slog = context.read<SystemLogProvider>();
 
     QuestModel? generatedQuest = await questProvider.fetchAndAddGeneratedQuest(
-      playerProvider: playerProvider,
-      targetStat: targetStat, // Якщо буде вибір
-      // customInstruction: customInstruction?.isNotEmpty == true ? customInstruction : null,
-    );
+        playerProvider: playerProvider,
+        targetStat: targetStat, // Якщо буде вибір
+        slog: slog
+        // customInstruction: customInstruction?.isNotEmpty == true ? customInstruction : null,
+        );
 
     if (mounted) {
       ScaffoldMessenger.of(context)
@@ -217,9 +220,10 @@ class _QuestsScreenState extends State<QuestsScreen>
                       playerProviderInstance.isLoading)
                   ? null
                   : () {
+                      final slog = context.read<SystemLogProvider>();
                       // Деактивуємо, якщо щось завантажується
-                      questProvider
-                          .generateDailyQuestsIfNeeded(playerProviderInstance);
+                      questProvider.generateDailyQuestsIfNeeded(
+                          playerProviderInstance, slog);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                             content:
@@ -369,9 +373,9 @@ class _QuestsScreenState extends State<QuestsScreen>
                             ElevatedButton(
                               child: const Text('Завершити'),
                               onPressed: () {
-                                context
-                                    .read<QuestProvider>()
-                                    .completeQuest(quest.id, playerProvider);
+                                final slog = context.read<SystemLogProvider>();
+                                context.read<QuestProvider>().completeQuest(
+                                    quest.id, playerProvider, slog);
                                 Navigator.of(ctx).pop();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
