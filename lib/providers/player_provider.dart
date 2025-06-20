@@ -1,9 +1,11 @@
 // lib/providers/player_provider.dart
 import 'dart:convert'; // Для jsonEncode/Decode
+import 'package:awakening/models/system_message_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/player_model.dart';
 import '../models/quest_model.dart'; // Для QuestDifficulty
+import 'system_log_provider.dart';
 
 class PlayerProvider with ChangeNotifier {
   late PlayerModel _player; // Зробимо late, бо будемо завантажувати асинхронно
@@ -61,13 +63,13 @@ class PlayerProvider with ChangeNotifier {
     await prefs.setString(_playerDataKey, playerDataString);
   }
 
-  void addXp(int amount) {
+  void addXp(int amount, SystemLogProvider slog) {
     if (_isLoading) return; // Не додавати XP, поки дані завантажуються
 
     _player.xp += amount;
     print("Added $amount XP. Total XP: ${_player.xp}/${_player.xpToNextLevel}");
     bool previousLevelUpState = _justLeveledUp; // Зберігаємо попередній стан
-    _checkLevelUp();
+    _checkLevelUp(slog);
     _savePlayerData(); // Зберігаємо після змін
     if (_justLeveledUp && !previousLevelUpState) {
       notifyListeners(); // Якщо _justLeveledUp щойно змінився
@@ -77,7 +79,7 @@ class PlayerProvider with ChangeNotifier {
     }
   }
 
-  void _checkLevelUp() {
+  void _checkLevelUp(SystemLogProvider slog) {
     bool leveledUpThisCheck = false;
     QuestDifficulty oldRank = _player.playerRank; // Зберігаємо старий ранг
     while (_player.xp >= _player.xpToNextLevel) {
@@ -92,18 +94,27 @@ class PlayerProvider with ChangeNotifier {
     if (leveledUpThisCheck) {
       _justLeveledUp = true;
       _player.updateRank(); // Оновлюємо ранг гравця
+      slog.addMessage("Рівень підвищено! Новий рівень: ${_player.level}",
+          MessageType.levelUp);
+
       if (_player.playerRank != oldRank) {
+        slog.addMessage(
+            "Ранг Мисливця підвищено! Новий ранг: ${_player.playerRank.name}",
+            MessageType.rankUp);
         print("RANK UP! New rank: ${_player.playerRank.name}");
         // Тут можна буде додати системне повідомлення про підвищення рангу
       }
     }
   }
 
-  bool increaseStat(PlayerStat stat, int amount) {
+  bool increaseStat(PlayerStat stat, int amount, SystemLogProvider slog) {
     if (_isLoading) return false;
     if (_player.availableStatPoints >= amount) {
       _player.stats[stat] = (_player.stats[stat] ?? 0) + amount;
       _player.availableStatPoints -= amount;
+      slog.addMessage("${PlayerModel.getStatName(stat)} збільшено на $amount.",
+          MessageType.statsIncreased,
+          showInSnackbar: false);
       _savePlayerData(); // Зберігаємо після змін
       notifyListeners();
       return true;

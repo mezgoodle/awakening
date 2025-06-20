@@ -5,6 +5,8 @@ import 'player_status_screen.dart';
 import 'quests_screen.dart'; // Створимо цей файл наступним
 import '../providers/quest_provider.dart';
 import '../providers/player_provider.dart';
+import '../providers/system_log_provider.dart';
+import '../utils/ui_helpers.dart'; // Імпорт хелпера
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,12 +38,13 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Використовуємо context.read для одноразового виклику
       final playerProvider = context.read<PlayerProvider>();
+      final slog = context.read<SystemLogProvider>();
       // Переконуємось, що дані гравця завантажені перед генерацією квестів,
       // щоб квести могли базуватись на рівні гравця.
       if (!playerProvider.isLoading) {
         context
             .read<QuestProvider>()
-            .generateDailyQuestsIfNeeded(playerProvider);
+            .generateDailyQuestsIfNeeded(playerProvider, slog);
       } else {
         // Якщо дані ще завантажуються, можна додати слухача, щоб викликати після завантаження
         // Або покластися на те, що generateDailyQuestsIfNeeded буде викликано при першому
@@ -80,10 +83,34 @@ class _HomeScreenState extends State<HomeScreen> {
         _initDailyQuests();
       }
     });
+    final systemLogProvider = context.read<SystemLogProvider>();
+    systemLogProvider.addListener(_showLatestSystemMessage);
+  }
+
+  @override
+  void dispose() {
+    context.read<SystemLogProvider>().removeListener(_showLatestSystemMessage);
+    super.dispose();
+  }
+
+  void _showLatestSystemMessage() {
+    final systemLogProvider = context.read<SystemLogProvider>();
+    final message = systemLogProvider
+        .latestMessageForSnackbar; // Це скине повідомлення в провайдері
+    if (message != null && mounted) {
+      // Відкладаємо показ SnackBar, щоб уникнути помилок під час build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          // Перевіряємо ще раз
+          showSystemSnackBar(context, message);
+        }
+      });
+    }
   }
 
   Future<void> _initDailyQuests() async {
     final playerProvider = context.read<PlayerProvider>();
+    final slog = context.read<SystemLogProvider>();
     // Чекаємо, поки PlayerProvider завантажить дані, якщо він це робить асинхронно
     // і має спосіб повідомити про завершення.
     // Оскільки PlayerProvider має isLoading, ми можемо чекати на його зміну.
@@ -123,11 +150,11 @@ class _HomeScreenState extends State<HomeScreen> {
       // При наступному відкритті (наступного дня) дані вже будуть.
       await context
           .read<QuestProvider>()
-          .generateDailyQuestsIfNeeded(playerProvider);
+          .generateDailyQuestsIfNeeded(playerProvider, slog);
     } else {
       await context
           .read<QuestProvider>()
-          .generateDailyQuestsIfNeeded(playerProvider);
+          .generateDailyQuestsIfNeeded(playerProvider, slog);
     }
   }
 
