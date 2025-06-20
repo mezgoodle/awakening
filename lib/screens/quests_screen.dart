@@ -8,6 +8,7 @@ import '../providers/player_provider.dart';
 import '../models/quest_model.dart';
 import '../models/player_model.dart';
 import '../widgets/quest_card.dart';
+import 'system_log_screen.dart';
 
 class QuestsScreen extends StatefulWidget {
   const QuestsScreen({super.key});
@@ -209,6 +210,17 @@ class _QuestsScreenState extends State<QuestsScreen>
       appBar: AppBar(
         title: const Text('Завдання'),
         actions: [
+          IconButton(
+            icon:
+                const Icon(Icons.notifications_outlined), // Іконка для журналу
+            tooltip: 'Журнал Системи',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (context) => const SystemLogScreen()),
+              );
+            },
+          ),
           // Кнопка для генерації щоденних квестів (для тесту)
           Consumer<PlayerProvider>(
               // Використовуємо Consumer для доступу до PlayerProvider

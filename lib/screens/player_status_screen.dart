@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
 import '../models/player_model.dart';
-import '../models/quest_model.dart'; // Для QuestDifficulty
+import '../models/quest_model.dart';
+import 'system_log_screen.dart';
 
 class PlayerStatusScreen extends StatefulWidget {
   const PlayerStatusScreen({super.key});
@@ -157,6 +158,16 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
       appBar: AppBar(
         title: const Text('Статус Гравця'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Журнал Системи',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (context) => const SystemLogScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Скинути прогрес (Тест)',
