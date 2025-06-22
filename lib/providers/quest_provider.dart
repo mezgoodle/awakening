@@ -113,6 +113,30 @@ class QuestProvider with ChangeNotifier {
         });
       }
 
+      if (quest.type == QuestType.rankUpChallenge) {
+        // Визначаємо, на який ранг був цей квест.
+        // Можна зберігати це в QuestModel або виводити з назви/опису,
+        // але простіше, якщо PlayerProvider знає, який наступний ранг очікується.
+        // Або, простіше, ми просто підвищуємо на наступний доступний ранг.
+        QuestDifficulty currentRank = playerProvider.player.playerRank;
+        if (currentRank.index < QuestDifficulty.values.length - 1) {
+          QuestDifficulty awardedRank =
+              QuestDifficulty.values[currentRank.index + 1];
+          // Перевіряємо, чи цей ранг відповідає максимальному за рівнем,
+          // щоб уникнути ситуації, коли квест був на D, а гравець вже S за рівнем.
+          // Хоча логіка requestRankUpChallenge має це запобігти.
+          QuestDifficulty maxRankByLevel =
+              PlayerModel.calculateRankByLevel(playerProvider.player.level);
+          if (awardedRank.index <= maxRankByLevel.index) {
+            playerProvider.awardNewRank(awardedRank, slog);
+          } else {
+            slog.addMessage(
+                "Неможливо присвоїти ранг ${QuestModel.getQuestDifficultyName(awardedRank)}, він вищий за максимально доступний за рівнем.",
+                MessageType.warning);
+          }
+        }
+      }
+
       // Позначаємо як виконаний і переміщуємо
       quest.isCompleted = true;
       quest.completedAt = DateTime.now();
