@@ -9,6 +9,7 @@ enum QuestType {
   milestone, // Досягнення певного етапу
   generated, // Згенерований (наприклад, через Gemini)
   story, // Сюжетний (для майбутнього)
+  rankUpChallenge, // Виклик підвищення рангу
 }
 
 // Складність квестів
@@ -65,6 +66,8 @@ class QuestModel {
         return "Згенероване";
       case QuestType.story:
         return "Сюжетне";
+      case QuestType.rankUpChallenge:
+        return "Рангове Випробування";
       default:
         return "Завдання";
     }

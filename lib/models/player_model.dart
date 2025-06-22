@@ -1,6 +1,4 @@
-// lib/models/player_model.dart
 import 'dart:math';
-import 'package:flutter/foundation.dart'; // для @required, якщо потрібно, або просто для ChangeNotifier пізніше
 import 'quest_model.dart';
 
 // Перелік для можливих характеристик
@@ -15,7 +13,7 @@ enum PlayerStat {
 enum PhysicalActivity {
   pullUps,
   pushUps,
-  runningDurationInMin, // Будемо питати тривалість бігу в хвилинах
+  runningDurationInMin,
   regularExercise,
 }
 
@@ -38,6 +36,7 @@ class PlayerModel {
     this.availableStatPoints = 0, // Початкові очки за замовчуванням 0
     this.baselinePhysicalPerformance,
     this.initialSurveyCompleted = false,
+    this.playerRank = QuestDifficulty.F,
   }) : stats =
             initialStats ?? // Якщо initialStats передано, використовуємо їх, інакше дефолтні
                 {
@@ -48,22 +47,18 @@ class PlayerModel {
                   PlayerStat.stamina: 5,
                 } {
     xpToNextLevel = calculateXpForLevel(level); // Розраховуємо для 1-го рівня
-    playerRank = _calculatePlayerRank(level); // Розраховуємо для 1-го рівня
+    // playerRank = _calculatePlayerRank(level); // Розраховуємо для 1-го рівня
   }
 
   // Метод для розрахунку рангу гравця на основі рівня
-  static QuestDifficulty _calculatePlayerRank(int level) {
-    if (level <= 5) return QuestDifficulty.F; // Додали F-ранг для початківців
-    if (level <= 10) return QuestDifficulty.E;
-    if (level <= 20) return QuestDifficulty.D;
-    if (level <= 30) return QuestDifficulty.C;
-    if (level <= 40) return QuestDifficulty.B;
-    if (level <= 50) return QuestDifficulty.A;
+  static QuestDifficulty calculateRankByLevel(int level) {
+    if (level < 5) return QuestDifficulty.F; // Додали F-ранг для початківців
+    if (level < 10) return QuestDifficulty.E;
+    if (level < 20) return QuestDifficulty.D;
+    if (level < 30) return QuestDifficulty.C;
+    if (level < 40) return QuestDifficulty.B;
+    if (level < 50) return QuestDifficulty.A;
     return QuestDifficulty.S;
-  }
-
-  void updateRank() {
-    playerRank = _calculatePlayerRank(level);
   }
 
   static int calculateXpForLevel(int level) {
@@ -152,6 +147,9 @@ class PlayerModel {
       level: loadedLevel,
       xp: json['xp'] as int,
       initialStats: loadedStats,
+      playerRank: json['playerRank'] != null
+          ? QuestDifficulty.values.byName(json['playerRank'] as String)
+          : QuestDifficulty.F,
       availableStatPoints: json['availableStatPoints'] as int,
       baselinePhysicalPerformance: loadedBaselinePerformance,
       initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ??
