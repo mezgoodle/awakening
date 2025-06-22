@@ -34,7 +34,6 @@ class PlayerProvider with ChangeNotifier {
 
   static const String _playerDataKey = 'playerData';
 
-  @override
   Future<void> _loadPlayerData() async {
     _isLoading = true;
 
@@ -113,8 +112,9 @@ class PlayerProvider with ChangeNotifier {
   }
 
   void _checkForAvailableRankUpChallenge() {
-    if (_isLoading)
-      return; // Не перевіряти, якщо дані ще не завантажені повністю
+    if (_isLoading) {
+      return;
+    }
 
     QuestDifficulty potentialNewRank =
         PlayerModel.calculateRankByLevel(_player.level);

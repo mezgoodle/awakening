@@ -1,6 +1,4 @@
-// lib/models/player_model.dart
 import 'dart:math';
-import 'package:flutter/foundation.dart'; // для @required, якщо потрібно, або просто для ChangeNotifier пізніше
 import 'quest_model.dart';
 
 // Перелік для можливих характеристик
@@ -15,7 +13,7 @@ enum PlayerStat {
 enum PhysicalActivity {
   pullUps,
   pushUps,
-  runningDurationInMin, // Будемо питати тривалість бігу в хвилинах
+  runningDurationInMin,
   regularExercise,
 }
 

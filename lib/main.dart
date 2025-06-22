@@ -5,9 +5,6 @@ import 'providers/player_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'providers/quest_provider.dart'; // Імпортуємо QuestProvider
 import 'providers/system_log_provider.dart'; // Якщо потрібно, але поки не використовуємо
-// import 'screens/player_status_screen.dart'; // Будемо використовувати новий HomeScreen
-import 'screens/home_screen.dart'; // Новий головний екран з навігацією
-import 'screens/initial_survey_screen.dart'; // Імпортуємо екран опитування
 import 'screens/splash_screen.dart'; // Створимо простий сплеш-скрін
 
 Future<void> main() async {

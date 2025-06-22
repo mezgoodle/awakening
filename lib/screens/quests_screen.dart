@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../providers/quest_provider.dart';
 import '../providers/player_provider.dart';
 import '../models/quest_model.dart';
-import '../models/player_model.dart';
 import '../widgets/quest_card.dart';
 import 'system_log_screen.dart';
 

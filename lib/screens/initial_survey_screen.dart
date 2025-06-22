@@ -150,8 +150,9 @@ class _InitialSurveyScreenState extends State<InitialSurveyScreen> {
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return 'Будь ласка, введіть число (можна 0)'; // Дозволяємо 0
+                    if (value == null || value.isEmpty) {
+                      return 'Будь ласка, введіть число (можна 0)';
+                    }
                     if (int.tryParse(value) == null || int.parse(value) < 0) {
                       return 'Введіть коректне невід\'ємне число';
                     }
@@ -168,8 +169,9 @@ class _InitialSurveyScreenState extends State<InitialSurveyScreen> {
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return 'Будь ласка, введіть число (можна 0)';
+                    }
                     if (int.tryParse(value) == null || int.parse(value) < 0) {
                       return 'Введіть коректне невід\'ємне число';
                     }
@@ -186,8 +188,9 @@ class _InitialSurveyScreenState extends State<InitialSurveyScreen> {
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return 'Будь ласка, введіть число (можна 0)';
+                    }
                     if (int.tryParse(value) == null || int.parse(value) < 0) {
                       return 'Введіть коректне невід\'ємне число';
                     }
