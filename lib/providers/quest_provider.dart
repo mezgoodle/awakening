@@ -113,6 +113,13 @@ class QuestProvider with ChangeNotifier {
         });
       }
 
+      if (quest.hpCostOnCompletion != null && quest.hpCostOnCompletion! > 0) {
+        playerProvider.takePlayerDamage(quest.hpCostOnCompletion!);
+        slog.addMessage(
+            "Ви доклали значних зусиль! Втрачено ${quest.hpCostOnCompletion} HP.",
+            MessageType.warning);
+      }
+
       if (quest.type == QuestType.rankUpChallenge) {
         // Визначаємо, на який ранг був цей квест.
         // Можна зберігати це в QuestModel або виводити з назви/опису,
