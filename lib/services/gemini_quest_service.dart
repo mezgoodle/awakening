@@ -1,4 +1,3 @@
-// lib/services/gemini_quest_service.dart
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -35,11 +34,9 @@ class GeminiQuestService {
     PlayerStat? targetStat, // Можлива фокусна характеристика
     String? customPromptInstruction, // Додаткова інструкція для промпту
   }) async {
-    final playerName = player.playerName == "Мисливець"
-        ? "гравець"
-        : player.playerName; // Узагальнення, якщо ім'я дефолтне
-    final playerRankName = QuestModel.getQuestDifficultyName(
-        player.playerRank); // Отримуємо назву рангу
+    final playerName =
+        player.playerName == "Мисливець" ? "гравець" : player.playerName;
+    final playerRankName = QuestModel.getQuestDifficultyName(player.playerRank);
 
     String baselinePerformancePrompt = "";
     if (player.baselinePhysicalPerformance != null &&
@@ -68,7 +65,6 @@ class GeminiQuestService {
           "\nВраховуй ці показники при генерації фізичних завдань (на Силу, Спритність, Витривалість), щоб вони були складними, але досяжними. Якщо, наприклад, гравець вказав 0 підтягувань, не давай завдання на підтягування, а запропонуй підготовчі вправи (наприклад, австралійські підтягування, негативні підтягування або вправи для зміцнення спини/рук). Адаптуй кількість повторень/тривалість до цих показників.";
     }
 
-    // Формування промпту з урахуванням targetStat для щоденних завдань (якщо це Пункт 2)
     String targetStatFocusPrompt = "";
     if (targetStat != null) {
       targetStatFocusPrompt = """
@@ -81,6 +77,29 @@ class GeminiQuestService {
 Якщо значення характеристики низьке (наприклад, 1-5 для статів, які починаються з 5), завдання має бути для початківців.
 Якщо високе (наприклад, 15+), завдання може бути більш просунутим.
 Нагорода XP та складність (Ранг) також мають відображати це.
+""";
+    }
+
+    String hpCostInstruction = "";
+    if (questType !=
+            QuestType
+                .daily && // Не застосовуємо вартість HP до щоденних завдань для простоти
+        (targetStat == PlayerStat.strength ||
+            targetStat == PlayerStat.stamina ||
+            targetStat == PlayerStat.agility ||
+            (customPromptInstruction != null &&
+                (customPromptInstruction.toLowerCase().contains("фізичн") ||
+                    customPromptInstruction
+                        .toLowerCase()
+                        .contains("тренуван"))))) {
+      hpCostInstruction = """
+
+Додаткова інструкція щодо HP:
+Якщо це завдання є фізично складним або вимагає значних зусиль (наприклад, інтенсивне тренування, подолання фізичних перешкод, бій з уявним супротивником), і його ранг складності D або вище, АБО якщо ранг завдання вищий за поточний Ранг Мисливця ($playerRankName), ти МОЖЕШ (але не зобов'язаний, роби це для приблизно 20-30% таких завдань) додати невелику "вартість здоров'я за зусилля".
+Якщо додаєш вартість здоров'я, включи в JSON відповідь поле:
+"hpCostOnCompletion": integer (наприклад, від 3 до ${(player.maxHp * 0.1).round().clamp(5, 20)}, тобто не більше 10% від максимального HP гравця, але в розумних межах 5-20)
+Це значення буде віднято від HP гравця ПІСЛЯ успішного виконання завдання. В описі завдання це згадувати не потрібно, це буде системний ефект. Якщо вартості здоров'я немає, не додавай це поле або встанови null.
+Уникай додавання hpCostOnCompletion для завдань типу "Щоденне".
 """;
     }
 
@@ -104,6 +123,7 @@ $baselinePerformancePrompt
 Тип завдання: ${QuestModel.getQuestTypeName(questType)}
 ${customPromptInstruction != null ? '\nДодаткова інструкція: $customPromptInstruction' : ''}
 $targetStatFocusPrompt 
+$hpCostInstruction
 Завдання повинно бути унікальним та цікавим.
 Воно повинно містити:
 1.  Назва (коротка, інтригуюча, в стилі Solo Leveling, 3-5 слів).
@@ -126,6 +146,7 @@ $targetStatFocusPrompt
 "xpReward": integer,
 "statRewards": {"stat_name_english": amount, ...} (або null),
 "targetStat": "stat_name_english" (або null, але має бути заповнено, якщо завдання генерується для конкретного targetStat)
+"hpCostOnCompletion": integer (або null)
 
 Приклад бажаного JSON (не копіюй його, це лише приклад структури):
 {
@@ -134,7 +155,8 @@ $targetStatFocusPrompt
   "difficulty": "E",
   "xpReward": 30,
   "statRewards": {"strength": 1, "stamina": 1},
-  "targetStat": "strength"
+  "targetStat": "strength",
+  "hpCostOnCompletion": 5
 }
 Переконайся, що назви характеристик в statRewards та targetStat є одними з: strength, agility, intelligence, perception, stamina.
 Не додавай жодних коментарів або пояснень поза JSON об'єктом. Тільки JSON.
@@ -233,6 +255,13 @@ $targetStatFocusPrompt
         }
       }
 
+      int? hpCost = jsonResponse['hpCostOnCompletion'] as int?;
+      if (hpCost != null) {
+        if (hpCost < 0) hpCost = 0;
+        hpCost = hpCost.clamp(0, (player.maxHp * 0.25).round());
+        if (hpCost == 0) hpCost = null;
+      }
+
       return QuestModel(
         title: jsonResponse['title'],
         description: jsonResponse['description'],
@@ -242,6 +271,7 @@ $targetStatFocusPrompt
         type: questType, // Тип, який ми передали для генерації
         statRewards: statRewards,
         targetStat: parsedTargetStat ?? targetStat,
+        hpCostOnCompletion: hpCost,
       );
     } catch (e) {
       print("Error generating quest with Gemini API: $e");
