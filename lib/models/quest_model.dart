@@ -1,6 +1,5 @@
-// lib/models/quest_model.dart
-import 'package:uuid/uuid.dart'; // Додай 'uuid: ^4.4.0' в pubspec.yaml
-import 'player_model.dart'; // Для PlayerStat
+import 'package:uuid/uuid.dart';
+import 'player_model.dart';
 
 // Типи квестів
 enum QuestType {
@@ -13,15 +12,7 @@ enum QuestType {
 }
 
 // Складність квестів
-enum QuestDifficulty {
-  F, // Найлегший
-  E,
-  D,
-  C,
-  B,
-  A,
-  S, // Найскладніший
-}
+enum QuestDifficulty { F, E, D, C, B, A, S }
 
 class QuestModel {
   final String id;
@@ -37,6 +28,7 @@ class QuestModel {
   bool isCompleted;
   final DateTime? createdAt; // Коли квест було створено/додано
   DateTime? completedAt; // Коли квест було виконано
+  final int? hpCostOnCompletion;
 
   QuestModel({
     String? id, // Дозволяємо передавати id або генеруємо
@@ -50,6 +42,7 @@ class QuestModel {
     this.isCompleted = false,
     DateTime? createdAt,
     this.completedAt,
+    this.hpCostOnCompletion,
   })  : id = id ?? const Uuid().v4(), // Генеруємо унікальний ID, якщо не надано
         createdAt = createdAt ?? DateTime.now();
 
@@ -73,12 +66,10 @@ class QuestModel {
     }
   }
 
-  // Метод для зручного отримання назви складності
   static String getQuestDifficultyName(QuestDifficulty difficulty) {
-    return difficulty.name; // Просто повертаємо назву enum (F, E, D...)
+    return difficulty.name;
   }
 
-  // toJson та fromJson для збереження/завантаження
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -93,6 +84,7 @@ class QuestModel {
       'isCompleted': isCompleted,
       'createdAt': createdAt?.toIso8601String(), // Зберігаємо як ISO рядок
       'completedAt': completedAt?.toIso8601String(),
+      'hpCostOnCompletion': hpCostOnCompletion,
     };
   }
 
@@ -128,6 +120,7 @@ class QuestModel {
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'] as String)
           : null,
+      hpCostOnCompletion: json['hpCostOnCompletion'] as int?,
     );
   }
 }
