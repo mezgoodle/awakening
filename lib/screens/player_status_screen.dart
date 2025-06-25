@@ -393,7 +393,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               ),
               onPressed: () {
                 final slog = context.read<SystemLogProvider>();
-                playerProvider.addXp(50, slog); // Додаємо 50 XP для тесту
+                playerProvider.addXp(250, slog); // Додаємо 50 XP для тесту
               },
               child: const Text('Додати 50 XP (Тест)'),
             ),
