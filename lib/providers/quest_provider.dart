@@ -107,11 +107,6 @@ class QuestProvider with ChangeNotifier {
 
       // Нараховуємо нагороди
       playerProvider.addXp(quest.xpReward, slog);
-      if (quest.statRewards != null) {
-        quest.statRewards!.forEach((stat, amount) {
-          playerProvider.increaseStat(stat, amount, slog);
-        });
-      }
 
       if (quest.hpCostOnCompletion != null && quest.hpCostOnCompletion! > 0) {
         playerProvider.takePlayerDamage(quest.hpCostOnCompletion!);
@@ -234,8 +229,6 @@ class QuestProvider with ChangeNotifier {
                 title: generatedQuest.title,
                 description: generatedQuest.description,
                 xpReward: generatedQuest.xpReward,
-                statRewards: generatedQuest.statRewards ??
-                    {stat: 1}, // Гарантуємо нагороду за цільовий стат
                 type: QuestType.daily,
                 difficulty: generatedQuest.difficulty,
                 targetStat:
@@ -293,7 +286,6 @@ class QuestProvider with ChangeNotifier {
   QuestModel _getFallbackDailyQuestForStat(
       PlayerStat stat, PlayerModel player) {
     int xpBase = 15 + (player.level * 2);
-    Map<PlayerStat, int> defaultStatReward = {stat: 1};
 
     switch (stat) {
       case PlayerStat.strength:
@@ -304,7 +296,6 @@ class QuestProvider with ChangeNotifier {
           xpReward: xpBase + 5,
           difficulty: QuestDifficulty.E,
           type: QuestType.daily,
-          statRewards: defaultStatReward,
           targetStat: stat,
         );
       case PlayerStat.agility:
@@ -315,7 +306,6 @@ class QuestProvider with ChangeNotifier {
           xpReward: xpBase,
           difficulty: QuestDifficulty.E,
           type: QuestType.daily,
-          statRewards: defaultStatReward,
           targetStat: stat,
         );
       case PlayerStat.intelligence:
@@ -326,7 +316,6 @@ class QuestProvider with ChangeNotifier {
           xpReward: xpBase,
           difficulty: QuestDifficulty.D,
           type: QuestType.daily,
-          statRewards: defaultStatReward,
           targetStat: stat,
         );
       case PlayerStat.perception:
@@ -337,7 +326,6 @@ class QuestProvider with ChangeNotifier {
           xpReward: xpBase - 5 > 0 ? xpBase - 5 : 5,
           difficulty: QuestDifficulty.D,
           type: QuestType.daily,
-          statRewards: defaultStatReward,
           targetStat: stat,
         );
       case PlayerStat.stamina:
@@ -348,7 +336,6 @@ class QuestProvider with ChangeNotifier {
           xpReward: xpBase + 5,
           difficulty: QuestDifficulty.E,
           type: QuestType.daily,
-          statRewards: defaultStatReward,
           targetStat: stat,
         );
       default: // На випадок, якщо додадуться нові стати
@@ -359,7 +346,6 @@ class QuestProvider with ChangeNotifier {
           xpReward: xpBase,
           difficulty: QuestDifficulty.E,
           type: QuestType.daily,
-          statRewards: defaultStatReward,
           targetStat: stat,
         );
     }

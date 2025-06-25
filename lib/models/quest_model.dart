@@ -19,12 +19,9 @@ class QuestModel {
   final String title;
   final String description;
   final int xpReward;
-  final Map<PlayerStat, int>?
-      statRewards; // Нагороди характеристиками (опціонально)
   final QuestType type;
   final QuestDifficulty difficulty;
-  final PlayerStat?
-      targetStat; // На яку характеристику сфокусовано (опціонально)
+  final PlayerStat? targetStat;
   bool isCompleted;
   final DateTime? createdAt; // Коли квест було створено/додано
   DateTime? completedAt; // Коли квест було виконано
@@ -35,7 +32,6 @@ class QuestModel {
     required this.title,
     required this.description,
     required this.xpReward,
-    this.statRewards,
     required this.type,
     required this.difficulty,
     this.targetStat,
@@ -76,8 +72,6 @@ class QuestModel {
       'title': title,
       'description': description,
       'xpReward': xpReward,
-      'statRewards':
-          statRewards?.map((key, value) => MapEntry(key.name, value)),
       'type': type.name, // Зберігаємо як рядок
       'difficulty': difficulty.name, // Зберігаємо як рядок
       'targetStat': targetStat?.name, // Зберігаємо як рядок або null
@@ -89,16 +83,6 @@ class QuestModel {
   }
 
   factory QuestModel.fromJson(Map<String, dynamic> json) {
-    Map<PlayerStat, int>? parsedStatRewards;
-    if (json['statRewards'] != null) {
-      parsedStatRewards = (json['statRewards'] as Map<String, dynamic>).map(
-        (key, value) => MapEntry(
-          PlayerStat.values.byName(key),
-          value as int,
-        ),
-      );
-    }
-
     PlayerStat? parsedTargetStat;
     if (json['targetStat'] != null) {
       parsedTargetStat = PlayerStat.values.byName(json['targetStat'] as String);
@@ -109,7 +93,6 @@ class QuestModel {
       title: json['title'] as String,
       description: json['description'] as String,
       xpReward: json['xpReward'] as int,
-      statRewards: parsedStatRewards,
       type: QuestType.values.byName(json['type'] as String),
       difficulty: QuestDifficulty.values.byName(json['difficulty'] as String),
       targetStat: parsedTargetStat,

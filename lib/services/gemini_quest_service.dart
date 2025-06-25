@@ -9,7 +9,7 @@ class GeminiQuestService {
 
   GeminiQuestService()
       : _model = GenerativeModel(
-            model: 'gemini-1.5-flash-latest',
+            model: 'gemini-2.0-flash-001',
             apiKey: dotenv.env['GEMINI_API_KEY']!,
             safetySettings: [
               SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
@@ -136,15 +136,13 @@ $hpCostInstruction
     - Ранг D: ${35 + player.level * 4}-${50 + player.level * 5} XP (якщо гравець D рангу)
     - Ранг C: ${50 + player.level * 5}-${75 + player.level * 6} XP (якщо гравець C рангу)
     Якщо є фокусна характеристика (targetStat) і її значення у гравця високе, XP може бути трохи більшим для відповідного рангу. Якщо низьке - трохи меншим.
-5.  Нагорода у вигляді очок характеристик (опціонально): об'єкт JSON, де ключ - назва характеристики (strength, agility, intelligence, perception, stamina), а значення - кількість очок (зазвичай 1, рідко 2 для дуже складних завдань). Якщо нагороди в характеристиках немає, цей ключ має бути відсутнім або значенням null. Нагорода має відповідати targetStat, якщо він вказаний.
-6.  Фокусна характеристика (опціонально, але ОБОВ'ЯЗКОВО якщо передано targetStat для генерації): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив. Має збігатися з переданим targetStat, якщо він був.
+5.  Фокусна характеристика (опціонально, але ОБОВ'ЯЗКОВО якщо передано targetStat для генерації): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив. Має збігатися з переданим targetStat, якщо він був.
 
 Надай відповідь ТІЛЬКИ у форматі JSON об'єкту з такими полями (використовуй подвійні лапки для ключів та рядкових значень):
 "title": "string",
 "description": "string",
 "difficulty": "string (F, E, D, C, B, A, S)",
 "xpReward": integer,
-"statRewards": {"stat_name_english": amount, ...} (або null),
 "targetStat": "stat_name_english" (або null, але має бути заповнено, якщо завдання генерується для конкретного targetStat)
 "hpCostOnCompletion": integer (або null)
 
@@ -154,11 +152,10 @@ $hpCostInstruction
   "description": "Твій показник віджимань - ${player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] ?? 'невідомий'}. Спробуй виконати 3 підходи по ${((player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] as int? ?? 10) * 0.6).round()} віджимань. Кожен рух має бути чітким.",
   "difficulty": "E",
   "xpReward": 30,
-  "statRewards": {"strength": 1, "stamina": 1},
   "targetStat": "strength",
   "hpCostOnCompletion": 5
 }
-Переконайся, що назви характеристик в statRewards та targetStat є одними з: strength, agility, intelligence, perception, stamina.
+Переконайся, що назва характеристики в targetStat є однією з: strength, agility, intelligence, perception, stamina.
 Не додавай жодних коментарів або пояснень поза JSON об'єктом. Тільки JSON.
 """;
     // print("--- PROMPT ---");
@@ -167,6 +164,7 @@ $hpCostInstruction
 
     try {
       final response = await _model.generateContent([Content.text(prompt)]);
+
       // print("--- RESPONSE ---");
       // print(response.text);
       // print("----------------");
@@ -265,11 +263,9 @@ $hpCostInstruction
       return QuestModel(
         title: jsonResponse['title'],
         description: jsonResponse['description'],
-        xpReward: (jsonResponse['xpReward'] as num)
-            .toInt(), // API може повернути double
+        xpReward: (jsonResponse['xpReward'] as num).toInt(),
         difficulty: difficulty,
         type: questType, // Тип, який ми передали для генерації
-        statRewards: statRewards,
         targetStat: parsedTargetStat ?? targetStat,
         hpCostOnCompletion: hpCost,
       );

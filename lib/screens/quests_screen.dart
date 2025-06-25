@@ -371,11 +371,7 @@ class _QuestsScreenState extends State<QuestsScreen>
                         return AlertDialog(
                           title: Text('Завершити завдання "${quest.title}"?'),
                           content: Text(
-                              'Ви дійсно виконали це завдання?\nНагорода: ${quest.xpReward} XP' +
-                                  (quest.statRewards != null &&
-                                          quest.statRewards!.isNotEmpty
-                                      ? '\nХарактеристики: ${quest.statRewards!.entries.map((e) => '${PlayerModel.getStatName(e.key)} +${e.value}').join(', ')}'
-                                      : '')),
+                              'Ви дійсно виконали це завдання?\nНагорода: ${quest.xpReward} XP'),
                           actions: <Widget>[
                             TextButton(
                               child: const Text('Скасувати'),
