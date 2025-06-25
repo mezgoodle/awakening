@@ -15,4 +15,4 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
-https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyCRiACcJAazjJSqmK9laQ9c1lXb4xcNiNE
+https://generativelanguage.googleapis.com/v1beta/models?key=
