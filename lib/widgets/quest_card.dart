@@ -100,12 +100,6 @@ class QuestCard extends StatelessWidget {
                               ?.copyWith(fontWeight: FontWeight.bold)),
                       Text('XP: ${quest.xpReward}',
                           style: theme.textTheme.bodyMedium),
-                      if (quest.statRewards != null &&
-                          quest.statRewards!.isNotEmpty)
-                        ...quest.statRewards!.entries.map((e) => Text(
-                              '${PlayerModel.getStatName(e.key)}: +${e.value}',
-                              style: theme.textTheme.bodyMedium,
-                            )),
                       if (quest.targetStat != null) ...[
                         const SizedBox(height: 8),
                         Text(

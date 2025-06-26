@@ -97,6 +97,7 @@ class PlayerProvider with ChangeNotifier {
     }
     if (leveledUpThisCheck) {
       _justLeveledUp = true;
+      _player.onLevelUp();
       slog.addMessage("Рівень підвищено! Новий рівень: ${_player.level}",
           MessageType.levelUp);
       _checkForAvailableRankUpChallenge();
@@ -212,6 +213,11 @@ class PlayerProvider with ChangeNotifier {
     if (_player.availableStatPoints >= amount) {
       _player.stats[stat] = (_player.stats[stat] ?? 0) + amount;
       _player.availableStatPoints -= amount;
+
+      if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
+        _player.onStatsChanged();
+      }
+
       slog.addMessage("${PlayerModel.getStatName(stat)} збільшено на $amount.",
           MessageType.statsIncreased,
           showInSnackbar: false);
@@ -248,23 +254,53 @@ class PlayerProvider with ChangeNotifier {
   void applyInitialStatBonuses(Map<PlayerStat, int> bonuses) {
     if (_isLoading) return;
     if (_player.initialSurveyCompleted) {
-      // Застосовуємо бонуси тільки один раз
       print(
           "Initial stat bonuses already applied or survey not marked as completed yet for this logic.");
       return;
     }
 
+    bool statsAffectingHpMpChanged = false;
     bonuses.forEach((stat, bonusAmount) {
       if (bonusAmount > 0) {
         _player.stats[stat] = (_player.stats[stat] ?? 0) + bonusAmount;
+        if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
+          statsAffectingHpMpChanged = true;
+        }
         print(
             "Applied +$bonusAmount bonus to ${PlayerModel.getStatName(stat)} from survey.");
       }
     });
-    // _savePlayerData() буде викликаний в setInitialSurveyCompleted(true)
-    // або можна викликати тут, якщо setInitialSurveyCompleted не викликається одразу після
-    // Але в нашому випадку викликається, тому можна не дублювати.
-    notifyListeners(); // Повідомити про зміну статів
+    if (statsAffectingHpMpChanged) {
+      _player.onStatsChanged();
+    }
+  }
+
+  void takePlayerDamage(int amount) {
+    if (_isLoading) return;
+    _player.takeDamage(amount);
+    _savePlayerData();
+    notifyListeners();
+  }
+
+  void restorePlayerHp(int amount) {
+    if (_isLoading) return;
+    _player.restoreHp(amount);
+    _savePlayerData();
+    notifyListeners();
+  }
+
+  void usePlayerMp(int amount) {
+    if (_isLoading) return;
+    _player.useMp(amount);
+    _savePlayerData();
+    notifyListeners();
+  }
+
+  void restorePlayerMp(int amount) {
+    if (_isLoading) return;
+    _player.restoreMp(amount);
+    _savePlayerData();
+    notifyListeners();
   }
 
   void setInitialSurveyCompleted(bool completed) {

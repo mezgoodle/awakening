@@ -19,15 +19,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Слухаємо зміни в PlayerProvider, щоб показати SnackBar
-    // Використовуємо context.read() тут, щоб не викликати перебудову при кожній зміні,
-    // а лише один раз підписатися на _justLeveledUp.
-    // Краще це робити через Listener або інший підхід, але для простоти поки так.
-    // Більш правильний підхід - це мати окремий віджет, який слухає specifically _justLeveledUp.
-    // Або передавати callback з provider.
-
-    // Оновлення: Краще використовувати context.watch і перевіряти _justLeveledUp в build.
-    // Але щоб SnackBar показувався лише один раз, ми можемо використати addPostFrameCallback
   }
 
   void _showLevelUpSnackBar(BuildContext context) {
@@ -124,6 +115,51 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
       default:
         return Colors.grey[700]!;
     }
+  }
+
+  Widget _buildResourceBar(String label, int currentValue, int maxValue,
+      Color barColor, IconData icon) {
+    double percentage =
+        maxValue > 0 ? (currentValue / maxValue).clamp(0.0, 1.0) : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: barColor, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              '$label: $currentValue / $maxValue',
+              style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Container(
+          // Контейнер для рамки прогрес-бару
+          height: 12, // Висота бару
+          decoration: BoxDecoration(
+            color: Colors.grey[800], // Фон бару
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.grey[700]!, width: 1),
+          ),
+          child: FractionallySizedBox(
+            // Для заповнення частини бару
+            widthFactor: percentage,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              decoration: BoxDecoration(
+                color: barColor,
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -276,7 +312,13 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               ),
             ),
             _buildInfoCard('Рівень:', '${player.level}'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            _buildResourceBar("HP", player.currentHp, player.maxHp,
+                Colors.redAccent[400]!, Icons.favorite_rounded),
+            const SizedBox(height: 12),
+            _buildResourceBar("MP", player.currentMp, player.maxMp,
+                Colors.blueAccent[400]!, Icons.flash_on_rounded),
+            const SizedBox(height: 20),
             Text(
               'Досвід: ${player.xp} / ${player.xpToNextLevel}',
               style: Theme.of(context).textTheme.bodyLarge,
@@ -351,9 +393,9 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               ),
               onPressed: () {
                 final slog = context.read<SystemLogProvider>();
-                playerProvider.addXp(50, slog); // Додаємо 50 XP для тесту
+                playerProvider.addXp(250, slog); // Додаємо 50 XP для тесту
               },
-              child: const Text('Додати 50 XP (Тест)'),
+              child: const Text('Додати 250 XP (Тест)'),
             ),
           ],
         ),
