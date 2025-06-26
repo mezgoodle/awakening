@@ -256,7 +256,7 @@ $hpCostInstruction
       int? hpCost = jsonResponse['hpCostOnCompletion'] as int?;
       if (hpCost != null) {
         if (hpCost < 0) hpCost = 0;
-        hpCost = hpCost.clamp(0, (player.maxHp * 0.25).round());
+        hpCost = hpCost.clamp(0, (player.maxHp * 0.1).round());
         if (hpCost == 0) hpCost = null;
       }
 
