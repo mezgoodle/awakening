@@ -68,33 +68,18 @@ class PlayerModel {
     currentMp = min(currentMp, maxMp);
   }
 
-  // Метод для розрахунку та оновлення maxHp/maxMp
-  // Викликатиметься при підвищенні рівня або зміні статів, що впливають на HP/MP
   void _calculateAndUpdateHpMp() {
     int stamina = stats[PlayerStat.stamina] ?? 0;
     int intelligence = stats[PlayerStat.intelligence] ?? 0;
 
-    maxHp = (level * baseHpPerLevel) +
-        (stamina * hpPerStaminaPoint) +
-        50; // +50 базове HP
-    maxMp = (level * baseMpPerLevel) +
-        (intelligence * mpPerIntelligencePoint) +
-        20; // +20 базове MP
-
-    // При оновленні максимальних значень, поточні не повинні їх перевищувати.
-    // Якщо ми збільшуємо максимальне HP/MP, поточне може залишитися тим самим або теж збільшитися.
-    // Зазвичай при левелапі HP/MP повністю відновлюються.
+    maxHp = (level * baseHpPerLevel) + (stamina * hpPerStaminaPoint) + 50;
+    maxMp =
+        (level * baseMpPerLevel) + (intelligence * mpPerIntelligencePoint) + 20;
   }
 
   // Метод, що викликається при підвищенні рівня (з PlayerProvider)
   void onLevelUp() {
-    int oldMaxHp = maxHp;
-    int oldMaxMp = maxMp;
-
-    _calculateAndUpdateHpMp(); // Перераховуємо максимальні значення
-
-    // Повністю відновлюємо HP/MP при підвищенні рівня
-    // Або можна додавати різницю: currentHp += (maxHp - oldMaxHp);
+    _calculateAndUpdateHpMp();
     currentHp = maxHp;
     currentMp = maxMp;
   }
@@ -104,25 +89,12 @@ class PlayerModel {
     int oldMaxHp = maxHp;
     int oldMaxMp = maxMp;
     _calculateAndUpdateHpMp();
-
-    // Зберігаємо відсоток поточного HP/MP і застосовуємо до нового max
-    // Щоб при збільшенні стаміни не відбувалося повного відновлення, а лише збільшення max
-    // і пропорційне збільшення current (якщо воно не було повним)
     double hpPercentage = (oldMaxHp > 0) ? currentHp / oldMaxHp : 1.0;
     double mpPercentage = (oldMaxMp > 0) ? currentMp / oldMaxMp : 1.0;
-
-    currentHp = (maxHp * hpPercentage).round();
-    currentMp = (maxMp * mpPercentage).round();
-
-    // Переконуємося, що не перевищили нові максимальні значення
-    currentHp = min(currentHp, maxHp);
-    currentMp = min(currentMp, maxMp);
-    // І що не менше 0
-    currentHp = max(0, currentHp);
-    currentMp = max(0, currentMp);
+    currentHp = (maxHp * hpPercentage).round().clamp(0, maxHp);
+    currentMp = (maxMp * mpPercentage).round().clamp(0, maxMp);
   }
 
-  // Методи для зміни поточних HP/MP (поки не використовуються активно)
   void takeDamage(int amount) {
     currentHp = max(0, currentHp - amount);
   }
@@ -139,9 +111,8 @@ class PlayerModel {
     currentMp = min(maxMp, currentMp + amount);
   }
 
-  // Метод для розрахунку рангу гравця на основі рівня
   static QuestDifficulty calculateRankByLevel(int level) {
-    if (level < 5) return QuestDifficulty.F; // Додали F-ранг для початківців
+    if (level < 5) return QuestDifficulty.F;
     if (level < 10) return QuestDifficulty.E;
     if (level < 20) return QuestDifficulty.D;
     if (level < 30) return QuestDifficulty.C;
@@ -151,13 +122,11 @@ class PlayerModel {
   }
 
   static int calculateXpForLevel(int level) {
-    if (level <= 0) return 100; // Базове значення для невалідних рівнів
-    if (level == 1) return 100; // Початкове XP для 2-го рівня
-    // Формула: (level^1.8 * 75) + ((level-1) * 150)
+    if (level <= 0) return 100;
+    if (level == 1) return 100;
     return (pow(level, 1.8) * 75 + (level - 1) * 150).round();
   }
 
-  // Метод для зручного отримання назви характеристики (для UI)
   static String getStatName(PlayerStat stat) {
     switch (stat) {
       case PlayerStat.strength:
@@ -196,54 +165,52 @@ class PlayerModel {
     };
   }
 
-  // Створення з JSON
   factory PlayerModel.fromJson(Map<String, dynamic> json) {
-    // Конвертація рядкових ключів статів назад в PlayerStat
-    Map<PlayerStat, int> loadedStats =
-        (json['stats'] as Map<String, dynamic>).map(
-      (key, value) => MapEntry(
-        PlayerStat.values.byName(key), // PlayerStat.values.byName(stringKey)
-        value as int,
-      ),
-    );
-
-    Map<PhysicalActivity, dynamic>? loadedBaselinePerformance;
-    if (json['baselinePhysicalPerformance'] != null) {
-      loadedBaselinePerformance = (json['baselinePhysicalPerformance']
-              as Map<String, dynamic>)
-          .map(
-        (key, value) {
-          try {
-            return MapEntry(PhysicalActivity.values.byName(key), value);
-          } catch (e) {
-            // Обробка можливої помилки, якщо enum змінився, а дані старі
-            print(
-                "Warning: Could not parse PhysicalActivity key '$key' from saved data.");
-            return MapEntry(PhysicalActivity.pullUps,
-                null); // Повертаємо щось, що потім можна відфільтрувати
-          }
-        },
-      )..removeWhere((key, value) =>
-          value == null &&
-          key ==
-              PhysicalActivity.pullUps); // Видаляємо, якщо ключ не розпарсився
-      if (loadedBaselinePerformance.isEmpty) loadedBaselinePerformance = null;
+    Map<PlayerStat, int> loadedStats = {};
+    if (json['stats'] is Map) {
+      loadedStats = (json['stats'] as Map<String, dynamic>).map(
+        (key, value) => MapEntry(
+          PlayerStat.values.byName(key),
+          value as int,
+        ),
+      );
+    } else {
+      print(
+          "Warning: 'stats' field is missing or not a map in JSON. Using default stats.");
+      loadedStats = {
+        PlayerStat.strength: 5,
+        PlayerStat.agility: 5,
+        PlayerStat.intelligence: 5,
+        PlayerStat.perception: 5,
+        PlayerStat.stamina: 5
+      };
     }
 
-    int loadedLevel =
-        json['level'] as int; // Отримуємо рівень для розрахунку рангу
+    Map<PhysicalActivity, dynamic>? loadedBaselinePerformance;
+    if (json['baselinePhysicalPerformance'] != null &&
+        json['baselinePhysicalPerformance'] is Map) {
+      try {
+        Map<String, dynamic> decodedMap =
+            Map<String, dynamic>.from(json['baselinePhysicalPerformance']);
+        loadedBaselinePerformance = decodedMap.map((key, value) =>
+            MapEntry(PhysicalActivity.values.byName(key), value));
+      } catch (e) {
+        print("Error decoding baselinePhysicalPerformance from JSON: $e");
+      }
+    }
 
     return PlayerModel(
       playerName: json['playerName'] as String? ?? "Мисливець",
-      level: loadedLevel,
-      xp: json['xp'] as int,
+      level: json['level'] as int? ?? 1,
+      xp: json['xp'] as int? ?? 0,
       initialStats: loadedStats,
-      playerRank: json['playerRank'] != null
+      availableStatPoints: json['availableStatPoints'] as int? ?? 0,
+      initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
+      playerRank: json['playerRank'] != null &&
+              (json['playerRank'] as String).isNotEmpty
           ? QuestDifficulty.values.byName(json['playerRank'] as String)
           : QuestDifficulty.F,
-      availableStatPoints: json['availableStatPoints'] as int,
       baselinePhysicalPerformance: loadedBaselinePerformance,
-      initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       loadedCurrentHp: json['currentHp'] as int?,
       loadedCurrentMp: json['currentMp'] as int?,
     );

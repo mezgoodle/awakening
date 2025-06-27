@@ -353,9 +353,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 entry.value,
                 context,
                 canIncrease: player.availableStatPoints > 0,
-                onIncrease: () {
-                  playerProvider.increaseStat(entry.key, 1, slog);
-                },
+                onIncrease: () {},
               );
             }).toList(),
             const SizedBox(height: 30),

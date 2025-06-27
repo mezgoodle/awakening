@@ -1,15 +1,20 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/player_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'providers/quest_provider.dart'; // Імпортуємо QuestProvider
-import 'providers/system_log_provider.dart'; // Якщо потрібно, але поки не використовуємо
-import 'screens/splash_screen.dart'; // Створимо простий сплеш-скрін
+import 'providers/quest_provider.dart';
+import 'providers/system_log_provider.dart';
+import 'screens/splash_screen.dart';
+
+import 'package:firebase_core/firebase_core.dart'; // Імпорт firebase_core
+import 'firebase_options.dart'; // Імпорт згенерованого файлу
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   final playerProvider = PlayerProvider();
   runApp(
     MultiProvider(
