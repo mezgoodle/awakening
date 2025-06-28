@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/player_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'providers/quest_provider.dart';
 import 'providers/system_log_provider.dart';
 import 'screens/splash_screen.dart';
@@ -15,11 +16,22 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  final playerProvider = PlayerProvider();
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(value: playerProvider),
+        Provider<FirebaseAuth>(
+          create: (_) => FirebaseAuth.instance,
+        ),
+        ChangeNotifierProxyProvider<FirebaseAuth, PlayerProvider>(
+          // `create` викликається один раз
+          create: (context) => PlayerProvider(null, null),
+          // `update` викликається при створенні та при зміні FirebaseAuth
+          update: (context, auth, previousPlayerProvider) {
+            previousPlayerProvider!.update(auth, null);
+            return previousPlayerProvider;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => QuestProvider()),
         ChangeNotifierProvider(create: (_) => SystemLogProvider()),
       ],

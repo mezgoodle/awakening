@@ -1,30 +1,28 @@
-// lib/providers/player_provider.dart
-// Прибираємо SharedPreferences, додаємо Firestore
-// import 'dart:convert';
-// import 'package:shared_preferences/shared_preferences.dart';
 import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/providers/quest_provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Імпорт Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/player_model.dart';
-import '../models/quest_model.dart'; // Для QuestDifficulty
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/quest_model.dart';
 import 'system_log_provider.dart';
 
 class PlayerProvider with ChangeNotifier {
-  late PlayerModel _player;
+  PlayerModel? _player;
   bool _isLoading = true;
   bool _justLeveledUp = false;
 
-  // Firestore instance та посилання на документ гравця
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  late DocumentReference _playerDocRef; // Буде ініціалізовано
+  final FirebaseAuth? _auth;
+  String? _uid;
 
-  // У нас один гравець, тому ID документа може бути фіксованим
-  // Або, якщо планується автентифікація, ID буде UID користувача
-  static const String _playerId =
-      'mainPlayerDocument'; // ID документа в Firestore
+  PlayerModel get player {
+    if (_player == null) {
+      return PlayerModel();
+    }
+    return _player!;
+  }
 
-  PlayerModel get player => _player;
   bool get isLoading => _isLoading;
   bool get justLeveledUp {
     if (_justLeveledUp) {
@@ -34,58 +32,85 @@ class PlayerProvider with ChangeNotifier {
     return false;
   }
 
-  PlayerProvider() {
-    // Шлях: колекція 'players' -> документ з ID '_playerId'
-    _playerDocRef = _firestore.collection('players').doc(_playerId);
-    _loadPlayerData();
+  PlayerProvider(this._auth, PlayerModel? initialPlayer) {
+    _player = initialPlayer;
+    _uid = _auth?.currentUser?.uid;
+    if (_uid != null) {
+      _loadPlayerData();
+    } else {
+      // Якщо uid ще не доступний, чекаємо на update
+      _isLoading = false; // Поки що не завантажуємо, чекаємо uid
+    }
+  }
+
+  void update(FirebaseAuth? auth, PlayerModel? newPlayer) {
+    if (auth?.currentUser?.uid != _uid) {
+      _uid = auth?.currentUser?.uid;
+      // Якщо uid змінився (наприклад, після входу), починаємо завантаження
+      if (_uid != null) {
+        _isLoading = true;
+        notifyListeners(); // Повідомити UI, що почалося завантаження
+        _loadPlayerData();
+      } else {
+        // Якщо користувач вийшов, скидаємо дані
+        _player = null;
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  DocumentReference? get _playerDocRef {
+    if (_uid == null) return null;
+    return _firestore.collection('players').doc(_uid);
   }
 
   Future<void> _loadPlayerData() async {
-    _isLoading = true;
-    // notifyListeners(); // Уникаємо
+    if (_playerDocRef == null) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
 
     try {
-      DocumentSnapshot playerSnapshot = await _playerDocRef.get();
+      DocumentSnapshot playerSnapshot = await _playerDocRef!.get();
       if (playerSnapshot.exists && playerSnapshot.data() != null) {
         _player = PlayerModel.fromJson(
             playerSnapshot.data()! as Map<String, dynamic>);
-        print("Player data loaded from Firestore.");
+        print("Player data for UID $_uid loaded from Firestore.");
       } else {
-        _player = PlayerModel(); // Створюємо нового гравця
-        print("No player data in Firestore, creating new player. Saving...");
-        await _savePlayerData(); // Зберігаємо нового гравця
+        _player = PlayerModel();
+        print(
+            "No player data in Firestore for UID $_uid, creating new player.");
+        await _savePlayerData();
       }
     } catch (e) {
       print(
           "Error loading player data from Firestore: $e. Creating new player.");
-      _player = PlayerModel(); // Створюємо нового при помилці
-      await _savePlayerData(); // Спробуємо зберегти, щоб створити документ
+      _player = PlayerModel();
+      await _savePlayerData();
     }
 
     _isLoading = false;
-    // _checkForAvailableRankUpChallenge(); // Якщо є ця логіка
     notifyListeners();
   }
 
   Future<void> _savePlayerData() async {
-    if (_isLoading && _player == null) {
-      // Запобіжник, якщо _player ще не ініціалізований
-      print("Player data not ready for saving yet.");
+    if (_playerDocRef == null || _player == null) {
+      print("Player data not ready for saving yet (no UID or player model).");
       return;
     }
     try {
-      await _playerDocRef.set(_player
-          .toJson()); // set перезапише документ або створить, якщо його немає
-      print("Player data saved to Firestore.");
+      await _playerDocRef!.set(_player!.toJson());
+      print("Player data for UID $_uid saved to Firestore.");
     } catch (e) {
       print("Error saving player data to Firestore: $e");
     }
   }
 
-  // Всі методи, що змінюють _player, тепер викликають _savePlayerData()
   void addXp(int amount, SystemLogProvider slog) {
-    if (_isLoading) return;
-    _player.xp += amount;
+    if (_isLoading || _player == null) return;
+    _player!.xp += amount;
     _checkLevelUp(slog);
     _savePlayerData();
     if (_justLeveledUp || amount > 0) {
@@ -95,24 +120,24 @@ class PlayerProvider with ChangeNotifier {
 
   void _checkLevelUp(SystemLogProvider? slog) {
     bool leveledUpThisCheck = false;
-    QuestDifficulty oldRank = _player.playerRank; // Зберігаємо старий ранг
-    int oldAvailablePoints = _player.availableStatPoints;
+    QuestDifficulty oldRank = _player!.playerRank; // Зберігаємо старий ранг
+    int oldAvailablePoints = _player!.availableStatPoints;
 
-    while (_player.xp >= _player.xpToNextLevel) {
-      _player.xp -= _player.xpToNextLevel;
-      _player.level++;
-      _player.xpToNextLevel = PlayerModel.calculateXpForLevel(_player.level);
-      _player.availableStatPoints += 3;
+    while (_player!.xp >= _player!.xpToNextLevel) {
+      _player!.xp -= _player!.xpToNextLevel;
+      _player!.level++;
+      _player!.xpToNextLevel = PlayerModel.calculateXpForLevel(_player!.level);
+      _player!.availableStatPoints += 3;
       leveledUpThisCheck = true;
     }
 
     if (leveledUpThisCheck) {
       _justLeveledUp = true;
-      _player.onLevelUp(); // Оновлення HP/MP
+      _player!.onLevelUp(); // Оновлення HP/MP
 
-      slog?.addMessage("Рівень підвищено! Новий рівень: ${_player.level}",
+      slog?.addMessage("Рівень підвищено! Новий рівень: ${_player!.level}",
           MessageType.levelUp);
-      int pointsGained = _player.availableStatPoints - oldAvailablePoints;
+      int pointsGained = _player!.availableStatPoints - oldAvailablePoints;
       if (pointsGained > 0) {
         slog?.addMessage("Отримано $pointsGained оч. характеристик!",
             MessageType.statsIncreased);
@@ -124,43 +149,41 @@ class PlayerProvider with ChangeNotifier {
 
   bool spendStatPoint(
       PlayerStat stat, int amountToSpend, SystemLogProvider slog) {
-    if (_isLoading) return false;
-    if (_player.availableStatPoints >= amountToSpend && amountToSpend > 0) {
-      _player.stats[stat] = (_player.stats[stat] ?? 0) + amountToSpend;
-      _player.availableStatPoints -= amountToSpend;
+    if (_isLoading || _player == null) return false;
+    if (_player!.availableStatPoints >= amountToSpend && amountToSpend > 0) {
+      _player!.stats[stat] = (_player!.stats[stat] ?? 0) + amountToSpend;
+      _player!.availableStatPoints -= amountToSpend;
       if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
-        _player.onStatsChanged();
+        _player!.onStatsChanged();
       }
       slog.addMessage(
-          "${PlayerModel.getStatName(stat)} збільшено на $amountToSpend (розподіл очок). Поточне значення: ${_player.stats[stat]}",
+          "${PlayerModel.getStatName(stat)} збільшено на $amountToSpend. Поточне значення: ${_player!.stats[stat]}",
           MessageType.statsIncreased);
       _savePlayerData();
       notifyListeners();
       return true;
     }
-    slog.addMessage(
-        "Недостатньо очок для збільшення ${PlayerModel.getStatName(stat)}.",
-        MessageType.warning);
+    slog.addMessage("Недостатньо очок.", MessageType.warning);
     return false;
   }
 
   void setPlayerName(String name) {
     if (_isLoading || name.trim().isEmpty) return;
-    _player.playerName = name.trim();
+    _player!.playerName = name.trim();
     _savePlayerData();
     notifyListeners();
   }
 
   void updateBaselinePerformance(Map<PhysicalActivity, dynamic> performance) {
     if (_isLoading) return;
-    _player.baselinePhysicalPerformance = Map.from(performance);
+    _player!.baselinePhysicalPerformance = Map.from(performance);
     _savePlayerData();
     notifyListeners();
   }
 
   void applyInitialStatBonuses(Map<PlayerStat, int> bonuses) {
-    if (_isLoading || _player.initialSurveyCompleted) {
-      if (_player.initialSurveyCompleted)
+    if (_isLoading || _player!.initialSurveyCompleted) {
+      if (_player!.initialSurveyCompleted)
         print("Initial stat bonuses already applied.");
       return;
     }
@@ -168,7 +191,7 @@ class PlayerProvider with ChangeNotifier {
     bool statsAffectingHpMpChanged = false;
     bonuses.forEach((stat, bonusAmount) {
       if (bonusAmount > 0) {
-        _player.stats[stat] = (_player.stats[stat] ?? 0) + bonusAmount;
+        _player!.stats[stat] = (_player!.stats[stat] ?? 0) + bonusAmount;
         if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
           statsAffectingHpMpChanged = true;
         }
@@ -178,7 +201,7 @@ class PlayerProvider with ChangeNotifier {
     });
 
     if (statsAffectingHpMpChanged) {
-      _player.onStatsChanged();
+      _player!.onStatsChanged();
     }
     // _savePlayerData() буде викликаний в setInitialSurveyCompleted
     // але для певності, якщо setInitialSurveyCompleted не викликається одразу,
@@ -189,64 +212,64 @@ class PlayerProvider with ChangeNotifier {
 
   void setInitialSurveyCompleted(bool completed) {
     if (_isLoading) return;
-    _player.initialSurveyCompleted = completed;
+    _player!.initialSurveyCompleted = completed;
     _savePlayerData();
     notifyListeners();
   }
 
   void takePlayerDamage(int amount) {
     if (_isLoading) return;
-    _player.takeDamage(amount);
+    _player!.takeDamage(amount);
     _savePlayerData();
     notifyListeners();
   }
 
   void restorePlayerHp(int amount) {
     if (_isLoading) return;
-    _player.restoreHp(amount);
+    _player!.restoreHp(amount);
     _savePlayerData();
     notifyListeners();
   }
 
   void usePlayerMp(int amount) {
     if (_isLoading) return;
-    _player.useMp(amount);
+    _player!.useMp(amount);
     _savePlayerData();
     notifyListeners();
   }
 
   void restorePlayerMp(int amount) {
     if (_isLoading) return;
-    _player.restoreMp(amount);
+    _player!.restoreMp(amount);
     _savePlayerData();
     notifyListeners();
   }
 
   Future<void> resetPlayerData() async {
-    try {
-      await _playerDocRef.delete(); // Видаляємо документ з Firestore
-      print("Player document deleted from Firestore.");
-    } catch (e) {
-      print(
-          "Error deleting player document from Firestore: $e (may not exist yet)");
+    if (_playerDocRef != null) {
+      try {
+        await _playerDocRef!.delete();
+        print("Player document for UID $_uid deleted from Firestore.");
+      } catch (e) {
+        print("Error deleting player document: $e");
+      }
     }
     _player = PlayerModel();
     _isLoading = false;
     _justLeveledUp = false;
-    await _savePlayerData(); // Зберігаємо нового гравця (створить документ)
-    // _checkForAvailableRankUpChallenge();
+    await _savePlayerData();
     notifyListeners();
     print("Player data has been reset in Firestore.");
   }
 
   void awardNewRank(QuestDifficulty newRank, SystemLogProvider slog) {
-    if (_player.playerRank.index < newRank.index) {
+    if (_player!.playerRank.index < newRank.index) {
       // Перевіряємо, чи новий ранг дійсно вищий
-      _player.playerRank = newRank;
+      _player!.playerRank = newRank;
       slog.addMessage(
-          "Ранг Мисливця підвищено! Новий ранг: ${QuestModel.getQuestDifficultyName(_player.playerRank)}",
+          "Ранг Мисливця підвищено! Новий ранг: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
           MessageType.rankUp);
-      print("RANK UP! Awarded new rank: ${_player.playerRank.name}");
+      print("RANK UP! Awarded new rank: ${_player!.playerRank.name}");
       _savePlayerData(); // Зберігаємо зміни
       notifyListeners();
       // _checkForAvailableRankUpChallenge(); // Перевіряємо, чи доступний наступний ранг-ап
@@ -257,9 +280,9 @@ class PlayerProvider with ChangeNotifier {
       SystemLogProvider slog, PlayerProvider playerProvider) async {
     if (_isLoading) return false;
 
-    QuestDifficulty currentRank = _player.playerRank;
+    QuestDifficulty currentRank = _player!.playerRank;
     QuestDifficulty nextPotentialRankByLevel =
-        PlayerModel.calculateRankByLevel(_player.level);
+        PlayerModel.calculateRankByLevel(_player!.level);
     bool hasActiveRankUpQuest = questProvider.activeQuests
         .any((q) => q.type == QuestType.rankUpChallenge);
 
