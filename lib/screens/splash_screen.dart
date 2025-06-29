@@ -92,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // (в реальному додатку тут може бути кнопка "Спробувати ще")
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content:
-            Text('Помилка автентифікації. Перевірте інтернет-з\'єднання.')));
+            Text("Помилка автентифікації. Перевірте інтернет-з'єднання.")));
     // Можна додати віджет з повідомленням про помилку замість індикатора
   }
 

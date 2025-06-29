@@ -17,9 +17,7 @@ class PlayerProvider with ChangeNotifier {
   String? _uid;
 
   PlayerModel get player {
-    if (_player == null) {
-      return PlayerModel();
-    }
+    _player ??= PlayerModel();
     return _player!;
   }
 
