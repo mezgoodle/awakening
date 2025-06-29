@@ -21,6 +21,10 @@ class PlayerProvider with ChangeNotifier {
     return _player!;
   }
 
+  String? getUserId() {
+    return _uid;
+  }
+
   bool get isLoading => _isLoading;
   bool get justLeveledUp {
     if (_justLeveledUp) {

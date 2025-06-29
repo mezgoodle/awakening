@@ -8,8 +8,8 @@ import 'providers/quest_provider.dart';
 import 'providers/system_log_provider.dart';
 import 'screens/splash_screen.dart';
 
-import 'package:firebase_core/firebase_core.dart'; // Імпорт firebase_core
-import 'firebase_options.dart'; // Імпорт згенерованого файлу
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,15 +29,19 @@ Future<void> main() async {
           create: (_) => FirebaseAuth.instance,
         ),
         ChangeNotifierProxyProvider<FirebaseAuth, PlayerProvider>(
-          // `create` викликається один раз
           create: (context) => PlayerProvider(null, null),
-          // `update` викликається при створенні та при зміні FirebaseAuth
           update: (context, auth, previousPlayerProvider) {
             previousPlayerProvider!.update(auth, null);
             return previousPlayerProvider;
           },
         ),
-        ChangeNotifierProvider(create: (_) => QuestProvider()),
+        ChangeNotifierProxyProvider<PlayerProvider, QuestProvider>(
+          create: (context) => QuestProvider(),
+          update: (context, playerProvider, previousQuestProvider) {
+            previousQuestProvider!.update(playerProvider);
+            return previousQuestProvider;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => SystemLogProvider()),
       ],
       child: const MyApp(),
