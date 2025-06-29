@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "342507382959",
+    "project_id": "awakening-549f0",
+    "storage_bucket": "awakening-549f0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:342507382959:android:95a77955f3e2b1a6270c5a",
+        "android_client_info": {
+          "package_name": "com.example.awakening"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHJfTdDg8ODY3xxtCzbE6zXY-8IKr8vII"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
