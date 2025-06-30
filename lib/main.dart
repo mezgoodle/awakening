@@ -31,15 +31,21 @@ Future<void> main() async {
         ChangeNotifierProxyProvider<FirebaseAuth, PlayerProvider>(
           create: (context) => PlayerProvider(null, null),
           update: (context, auth, previousPlayerProvider) {
-            previousPlayerProvider!.update(auth, null);
-            return previousPlayerProvider;
+            if (previousPlayerProvider != null) {
+              previousPlayerProvider.update(auth, null);
+              return previousPlayerProvider;
+            }
+            return PlayerProvider(auth, null);
           },
         ),
         ChangeNotifierProxyProvider<PlayerProvider, QuestProvider>(
           create: (context) => QuestProvider(),
           update: (context, playerProvider, previousQuestProvider) {
-            previousQuestProvider!.update(playerProvider);
-            return previousQuestProvider;
+            if (previousQuestProvider != null) {
+              previousQuestProvider.update(playerProvider);
+              return previousQuestProvider;
+            }
+            return QuestProvider();
           },
         ),
         ChangeNotifierProvider(create: (_) => SystemLogProvider()),

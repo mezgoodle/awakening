@@ -1,16 +1,12 @@
-// lib/providers/quest_provider.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-// SharedPreferences більше не потрібен для цього провайдера
-// import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/quest_model.dart';
 import '../models/player_model.dart';
 import 'player_provider.dart';
 import 'system_log_provider.dart';
 import '../services/gemini_quest_service.dart';
-import '../models/system_message_model.dart'; // Імпорт для MessageType
+import '../models/system_message_model.dart';
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
