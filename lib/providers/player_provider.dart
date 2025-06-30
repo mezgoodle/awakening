@@ -128,7 +128,6 @@ class PlayerProvider with ChangeNotifier {
     for (String skillId in _player!.learnedSkillIds) {
       final skill = _skillProvider!.getSkillById(skillId);
       if (skill != null && skill.skillType == SkillType.passive) {
-        // Застосовуємо ефекти
         skill.effects.forEach((effectType, value) {
           switch (effectType) {
             case SkillEffectType.addStrength:
@@ -171,7 +170,8 @@ class PlayerProvider with ChangeNotifier {
     _player!.currentHp = min(_player!.currentHp, _modifiedMaxHp!);
     _player!.currentMp = min(_player!.currentMp, _modifiedMaxMp!);
 
-    print("Passive skill bonuses applied.");
+    print(
+        "Passive skill bonuses applied. Final Strength: ${_modifiedStats![PlayerStat.strength]}");
   }
 
   Future<void> _savePlayerData() async {

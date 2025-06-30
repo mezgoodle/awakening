@@ -40,20 +40,21 @@ class PlayerModel {
   static const int baseMpPerLevel = 5;
   static const int mpPerIntelligencePoint = 3;
 
-  PlayerModel({
-    this.playerName = "Мисливець",
-    this.level = 1,
-    this.xp = 0,
-    Map<PlayerStat, int>? initialStats,
-    this.availableStatPoints = 0,
-    this.availableSkillPoints = 0,
-    this.learnedSkillIds = const [],
-    this.baselinePhysicalPerformance,
-    this.initialSurveyCompleted = false,
-    this.playerRank = QuestDifficulty.F,
-    int? loadedCurrentHp,
-    int? loadedCurrentMp,
-  }) : stats = initialStats ??
+  PlayerModel(
+      {this.playerName = "Мисливець",
+      this.level = 1,
+      this.xp = 0,
+      Map<PlayerStat, int>? initialStats,
+      this.availableStatPoints = 0,
+      this.availableSkillPoints = 0,
+      this.baselinePhysicalPerformance,
+      this.initialSurveyCompleted = false,
+      this.playerRank = QuestDifficulty.F,
+      int? loadedCurrentHp,
+      int? loadedCurrentMp,
+      List<String>? initialLearnedSkillIds})
+      : learnedSkillIds = initialLearnedSkillIds ?? [],
+        stats = initialStats ??
             {
               PlayerStat.strength: 5,
               PlayerStat.agility: 5,
@@ -212,7 +213,7 @@ class PlayerModel {
       initialStats: loadedStats,
       availableStatPoints: json['availableStatPoints'] as int? ?? 0,
       availableSkillPoints: json['availableSkillPoints'] as int? ?? 0,
-      learnedSkillIds:
+      initialLearnedSkillIds:
           (json['learnedSkillIds'] as List<dynamic>?)?.cast<String>() ?? [],
       initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       playerRank: json['playerRank'] != null &&
