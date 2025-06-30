@@ -1,12 +1,12 @@
-// lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'player_status_screen.dart';
-import 'quests_screen.dart'; // Створимо цей файл наступним
+import 'quests_screen.dart';
+import 'skills_screen.dart';
 import '../providers/quest_provider.dart';
 import '../providers/player_provider.dart';
 import '../providers/system_log_provider.dart';
-import '../utils/ui_helpers.dart'; // Імпорт хелпера
+import '../utils/ui_helpers.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,8 +20,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static final List<Widget> _widgetOptions = <Widget>[
     const PlayerStatusScreen(),
-    const QuestsScreen(), // Додамо екран квестів
-    // Тут можна додати більше екранів, наприклад, "Інвентар", "Навички"
+    const QuestsScreen(),
+    const SkillsScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -161,23 +161,26 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // AppBar тут не потрібен, бо кожен екран (_widgetOptions) матиме свій
       body: Center(
         child: _widgetOptions.elementAt(_selectedIndex),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_search_outlined), // Іконка для статусу
+            icon: Icon(Icons.person_search_outlined),
             activeIcon: Icon(Icons.person_search),
             label: 'Статус',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt_outlined), // Іконка для квестів
+            icon: Icon(Icons.list_alt_outlined),
             activeIcon: Icon(Icons.list_alt),
             label: 'Завдання',
           ),
-          // Можна додати ще вкладки
+          BottomNavigationBarItem(
+            icon: Icon(Icons.star_purple500_outlined),
+            activeIcon: Icon(Icons.star_purple500),
+            label: 'Навички',
+          ),
         ],
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,

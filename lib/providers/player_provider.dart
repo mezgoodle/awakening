@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/providers/quest_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +8,8 @@ import '../models/player_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/quest_model.dart';
 import 'system_log_provider.dart';
+import 'skill_provider.dart';
+import '../models/skill_model.dart';
 
 class PlayerProvider with ChangeNotifier {
   PlayerModel? _player;
@@ -15,6 +19,16 @@ class PlayerProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth? _auth;
   String? _uid;
+
+  Map<PlayerStat, int>? _modifiedStats;
+  int? _modifiedMaxHp;
+  int? _modifiedMaxMp;
+
+  Map<PlayerStat, int> get finalStats => _modifiedStats ?? player.stats;
+  int get finalMaxHp => _modifiedMaxHp ?? player.maxHp;
+  int get finalMaxMp => _modifiedMaxMp ?? player.maxMp;
+
+  SkillProvider? _skillProvider;
 
   PlayerModel get player {
     _player ??= PlayerModel();
@@ -34,27 +48,28 @@ class PlayerProvider with ChangeNotifier {
     return false;
   }
 
-  PlayerProvider(this._auth, PlayerModel? initialPlayer) {
+  PlayerProvider(
+      this._auth, SkillProvider? skillProvider, PlayerModel? initialPlayer) {
+    _skillProvider = skillProvider;
     _player = initialPlayer;
     _uid = _auth?.currentUser?.uid;
     if (_uid != null) {
       _loadPlayerData();
     } else {
-      // Якщо uid ще не доступний, чекаємо на update
-      _isLoading = false; // Поки що не завантажуємо, чекаємо uid
+      _isLoading = false;
     }
   }
 
-  void update(FirebaseAuth? auth, PlayerModel? newPlayer) {
+  void update(FirebaseAuth? auth, SkillProvider? skillProvider,
+      PlayerModel? newPlayer) {
+    _skillProvider = skillProvider;
     if (auth?.currentUser?.uid != _uid) {
       _uid = auth?.currentUser?.uid;
-      // Якщо uid змінився (наприклад, після входу), починаємо завантаження
       if (_uid != null) {
         _isLoading = true;
-        notifyListeners(); // Повідомити UI, що почалося завантаження
+        notifyListeners();
         _loadPlayerData();
       } else {
-        // Якщо користувач вийшов, скидаємо дані
         _player = null;
         _isLoading = false;
         notifyListeners();
@@ -93,8 +108,70 @@ class PlayerProvider with ChangeNotifier {
       await _savePlayerData();
     }
 
+    if (_player != null) {
+      _applyPassiveSkillBonuses();
+    }
+
     _isLoading = false;
     notifyListeners();
+  }
+
+  void _applyPassiveSkillBonuses() {
+    if (_player == null || _skillProvider == null) return;
+
+    _modifiedStats = Map.from(_player!.stats);
+
+    double maxHpMultiplier = 1.0;
+    double maxMpMultiplier = 1.0;
+    double xpGainMultiplier = 1.0;
+
+    for (String skillId in _player!.learnedSkillIds) {
+      final skill = _skillProvider!.getSkillById(skillId);
+      if (skill != null && skill.skillType == SkillType.passive) {
+        // Застосовуємо ефекти
+        skill.effects.forEach((effectType, value) {
+          switch (effectType) {
+            case SkillEffectType.addStrength:
+              _modifiedStats![PlayerStat.strength] =
+                  (_modifiedStats![PlayerStat.strength] ?? 0) + value.toInt();
+              break;
+            case SkillEffectType.addStamina:
+              _modifiedStats![PlayerStat.stamina] =
+                  (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
+              break;
+            case SkillEffectType.multiplyMaxHp:
+              maxHpMultiplier += value / 100.0;
+              break;
+            case SkillEffectType.multiplyMaxMp:
+              maxMpMultiplier += value / 100.0;
+              break;
+            case SkillEffectType.multiplyXpGain:
+              xpGainMultiplier += value / 100.0;
+              break;
+            default:
+              break;
+          }
+        });
+      }
+    }
+
+    int stamina = _modifiedStats![PlayerStat.stamina] ?? 0;
+    int intelligence = _modifiedStats![PlayerStat.intelligence] ?? 0;
+    _modifiedMaxHp = (((_player!.level * PlayerModel.baseHpPerLevel) +
+                (stamina * PlayerModel.hpPerStaminaPoint) +
+                50) *
+            maxHpMultiplier)
+        .round();
+    _modifiedMaxMp = (((_player!.level * PlayerModel.baseMpPerLevel) +
+                (intelligence * PlayerModel.mpPerIntelligencePoint) +
+                20) *
+            maxMpMultiplier)
+        .round();
+
+    _player!.currentHp = min(_player!.currentHp, _modifiedMaxHp!);
+    _player!.currentMp = min(_player!.currentMp, _modifiedMaxMp!);
+
+    print("Passive skill bonuses applied.");
   }
 
   Future<void> _savePlayerData() async {
@@ -121,6 +198,7 @@ class PlayerProvider with ChangeNotifier {
   }
 
   void _checkLevelUp(SystemLogProvider? slog) {
+    if (_player == null) return;
     bool leveledUpThisCheck = false;
     QuestDifficulty oldRank = _player!.playerRank; // Зберігаємо старий ранг
     int oldAvailablePoints = _player!.availableStatPoints;
@@ -130,12 +208,17 @@ class PlayerProvider with ChangeNotifier {
       _player!.level++;
       _player!.xpToNextLevel = PlayerModel.calculateXpForLevel(_player!.level);
       _player!.availableStatPoints += 3;
+      if (_player!.level % 5 == 0) {
+        _player!.availableSkillPoints += 1;
+        slog?.addMessage("Отримано 1 очко навичок!", MessageType.info);
+      }
       leveledUpThisCheck = true;
     }
 
     if (leveledUpThisCheck) {
       _justLeveledUp = true;
-      _player!.onLevelUp(); // Оновлення HP/MP
+      _player!.onLevelUp();
+      _applyPassiveSkillBonuses();
 
       slog?.addMessage("Рівень підвищено! Новий рівень: ${_player!.level}",
           MessageType.levelUp);
@@ -149,12 +232,44 @@ class PlayerProvider with ChangeNotifier {
     }
   }
 
+  bool learnSkill(String skillId, SystemLogProvider slog) {
+    if (_player == null || _skillProvider == null) return false;
+
+    final skill = _skillProvider!.getSkillById(skillId);
+    if (skill == null) return false;
+
+    if (_player!.learnedSkillIds.contains(skillId)) {
+      slog.addMessage(
+          "Навичка '${skill.name}' вже вивчена.", MessageType.warning);
+      return false;
+    }
+
+    if (_skillProvider!
+        .canLearnSkill(_player!, skillId, _player!.availableSkillPoints)) {
+      _player!.availableSkillPoints -= skill.skillPointCost;
+      _player!.learnedSkillIds.add(skillId);
+      if (skill.skillType == SkillType.passive) {
+        _applyPassiveSkillBonuses();
+      }
+
+      slog.addMessage("Вивчено навичку: '${skill.name}'!", MessageType.levelUp);
+      _savePlayerData();
+      notifyListeners();
+      return true;
+    } else {
+      slog.addMessage("Недостатньо умов для вивчення навички '${skill.name}'.",
+          MessageType.warning);
+      return false;
+    }
+  }
+
   bool spendStatPoint(
       PlayerStat stat, int amountToSpend, SystemLogProvider slog) {
     if (_isLoading || _player == null) return false;
     if (_player!.availableStatPoints >= amountToSpend && amountToSpend > 0) {
       _player!.stats[stat] = (_player!.stats[stat] ?? 0) + amountToSpend;
       _player!.availableStatPoints -= amountToSpend;
+      _applyPassiveSkillBonuses();
       if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
         _player!.onStatsChanged();
       }
@@ -205,11 +320,9 @@ class PlayerProvider with ChangeNotifier {
     if (statsAffectingHpMpChanged) {
       _player!.onStatsChanged();
     }
-    // _savePlayerData() буде викликаний в setInitialSurveyCompleted
-    // але для певності, якщо setInitialSurveyCompleted не викликається одразу,
-    // або якщо ця логіка зміниться, краще додати збереження і тут:
+
     _savePlayerData();
-    notifyListeners(); // Повідомити про зміну статів
+    notifyListeners();
   }
 
   void setInitialSurveyCompleted(bool completed) {

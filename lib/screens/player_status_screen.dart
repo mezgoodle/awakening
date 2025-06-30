@@ -1,4 +1,3 @@
-// lib/screens/player_status_screen.dart
 import 'package:awakening/providers/system_log_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -352,8 +351,10 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 PlayerModel.getStatName(entry.key),
                 entry.value,
                 context,
-                canIncrease: false,
-                onIncrease: () {},
+                canIncrease: true,
+                onIncrease: () {
+                  playerProvider.spendStatPoint(entry.key, 1, slog);
+                },
               );
             }).toList(),
             const SizedBox(height: 30),

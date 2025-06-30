@@ -24,6 +24,8 @@ class PlayerModel {
   late int xpToNextLevel;
   Map<PlayerStat, int> stats;
   int availableStatPoints;
+  int availableSkillPoints;
+  List<String> learnedSkillIds;
   Map<PhysicalActivity, dynamic>? baselinePhysicalPerformance;
   bool initialSurveyCompleted;
   late QuestDifficulty playerRank;
@@ -44,6 +46,8 @@ class PlayerModel {
     this.xp = 0,
     Map<PlayerStat, int>? initialStats,
     this.availableStatPoints = 0,
+    this.availableSkillPoints = 0,
+    this.learnedSkillIds = const [],
     this.baselinePhysicalPerformance,
     this.initialSurveyCompleted = false,
     this.playerRank = QuestDifficulty.F,
@@ -153,6 +157,8 @@ class PlayerModel {
       'xpToNextLevel': xpToNextLevel,
       'stats': stats.map((key, value) => MapEntry(key.name, value)),
       'availableStatPoints': availableStatPoints,
+      'availableSkillPoints': availableSkillPoints,
+      'learnedSkillIds': learnedSkillIds,
       'baselinePhysicalPerformance': baselinePhysicalPerformance?.map(
         (key, value) => MapEntry(key.name, value),
       ),
@@ -205,6 +211,9 @@ class PlayerModel {
       xp: json['xp'] as int? ?? 0,
       initialStats: loadedStats,
       availableStatPoints: json['availableStatPoints'] as int? ?? 0,
+      availableSkillPoints: json['availableSkillPoints'] as int? ?? 0,
+      learnedSkillIds:
+          (json['learnedSkillIds'] as List<dynamic>?)?.cast<String>() ?? [],
       initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       playerRank: json['playerRank'] != null &&
               (json['playerRank'] as String).isNotEmpty
