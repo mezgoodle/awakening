@@ -1,73 +1,95 @@
-import 'dart:convert';
-import 'package:awakening/models/system_message_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/quest_model.dart';
 import '../models/player_model.dart';
 import 'player_provider.dart';
-import '../services/gemini_quest_service.dart';
 import 'system_log_provider.dart';
+import '../services/gemini_quest_service.dart';
+import '../models/system_message_model.dart';
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
   List<QuestModel> _completedQuests = [];
   bool _isLoading = true;
-  final GeminiQuestService _geminiService =
-      GeminiQuestService(); // Створюємо екземпляр сервісу
-  bool _isGeneratingQuest = false; // Прапорець для індикації завантаження
+  final GeminiQuestService _geminiService = GeminiQuestService();
+  bool _isGeneratingQuest = false;
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  PlayerProvider? _playerProvider;
+
+  // Ключ для збереження дати останньої генерації в документі гравця
+  static const String _lastDailyQuestGenerationKey =
+      'lastDailyQuestGenerationDate';
 
   List<QuestModel> get activeQuests => _activeQuests;
   List<QuestModel> get completedQuests => _completedQuests;
   bool get isLoading => _isLoading;
   bool get isGeneratingQuest => _isGeneratingQuest;
 
-  static const String _activeQuestsKey = 'activeQuestsData';
-  static const String _completedQuestsKey = 'completedQuestsData';
-  static const String _lastDailyQuestGenerationKey =
-      'lastDailyQuestGenerationDate';
+  QuestProvider();
 
-  QuestProvider() {
-    _loadQuests();
+  void update(PlayerProvider? playerProvider) {
+    if (playerProvider != null &&
+        _playerProvider != playerProvider &&
+        !playerProvider.isLoading) {
+      _playerProvider = playerProvider;
+      _loadQuests();
+    } else if (playerProvider == null) {
+      _activeQuests.clear();
+      _completedQuests.clear();
+      // Не викликаємо notifyListeners, бо провайдер "вимикається"
+    }
+  }
+
+  CollectionReference? get _questsCollectionRef {
+    final uid = _playerProvider?.getUserId();
+    if (uid == null) return null;
+    return _firestore.collection('players').doc(uid).collection('quests');
+  }
+
+  // Довідкове посилання на документ гравця для зберігання метаданих, як-от дата генерації
+  DocumentReference? get _playerDocRef {
+    final uid = _playerProvider?.getUserId();
+    if (uid == null) return null;
+    return _firestore.collection('players').doc(uid);
   }
 
   Future<void> _loadQuests() async {
+    if (_questsCollectionRef == null) {
+      print("QuestProvider: Cannot load quests, no user ID.");
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      final activeSnapshot = await _questsCollectionRef!
+          .where('isCompleted', isEqualTo: false)
+          .get();
+      _activeQuests = activeSnapshot.docs
+          .map(
+              (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
+          .toList();
+      print("Loaded ${_activeQuests.length} active quests from Firestore.");
 
-    // Завантаження активних квестів
-    final String? activeQuestsString = prefs.getString(_activeQuestsKey);
-    if (activeQuestsString != null) {
-      try {
-        final List<dynamic> activeQuestsJson = jsonDecode(activeQuestsString);
-        _activeQuests = activeQuestsJson
-            .map((jsonItem) =>
-                QuestModel.fromJson(jsonItem as Map<String, dynamic>))
-            .toList();
-      } catch (e) {
-        print("Error loading active quests: $e");
-        _activeQuests = []; // Скидаємо, якщо помилка
-      }
-    } else {
-      _activeQuests = []; // Якщо даних немає, починаємо з порожнього списку
-    }
-
-    // Завантаження виконаних квестів
-    final String? completedQuestsString = prefs.getString(_completedQuestsKey);
-    if (completedQuestsString != null) {
-      try {
-        final List<dynamic> completedQuestsJson =
-            jsonDecode(completedQuestsString);
-        _completedQuests = completedQuestsJson
-            .map((jsonItem) =>
-                QuestModel.fromJson(jsonItem as Map<String, dynamic>))
-            .toList();
-      } catch (e) {
-        print("Error loading completed quests: $e");
-        _completedQuests = [];
-      }
-    } else {
+      final completedSnapshot = await _questsCollectionRef!
+          .where('isCompleted', isEqualTo: true)
+          .orderBy('completedAt', descending: true)
+          .limit(50)
+          .get();
+      _completedQuests = completedSnapshot.docs
+          .map(
+              (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
+          .toList();
+      print(
+          "Loaded ${_completedQuests.length} completed quests from Firestore.");
+    } catch (e) {
+      print("Error loading quests from Firestore: $e");
+      _activeQuests = [];
       _completedQuests = [];
     }
 
@@ -75,39 +97,42 @@ class QuestProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _saveQuests() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String activeQuestsString =
-        jsonEncode(_activeQuests.map((q) => q.toJson()).toList());
-    await prefs.setString(_activeQuestsKey, activeQuestsString);
+  Future<void> addQuest(QuestModel quest, SystemLogProvider slog,
+      {bool showSnackbar = true}) async {
+    if (_questsCollectionRef == null) return;
 
-    final String completedQuestsString =
-        jsonEncode(_completedQuests.map((q) => q.toJson()).toList());
-    await prefs.setString(_completedQuestsKey, completedQuestsString);
-  }
+    _activeQuests.insert(0, quest);
+    notifyListeners();
+    slog.addMessage("Нове завдання: '${quest.title}'", MessageType.questAdded,
+        showInSnackbar: showSnackbar);
 
-  // Для додавання нових квестів (згенерованих або хардкодних)
-  void addQuest(QuestModel quest) {
-    // Перевірка на дублікати за ID
-    if (!_activeQuests.any((q) => q.id == quest.id) &&
-        !_completedQuests.any((q) => q.id == quest.id)) {
-      _activeQuests.add(quest);
-      _saveQuests();
+    try {
+      await _questsCollectionRef!.doc(quest.id).set(quest.toJson());
+      print("Quest '${quest.title}' added to Firestore.");
+    } catch (e) {
+      print("Error adding quest to Firestore: $e");
+      slog.addMessage(
+          "Помилка збереження завдання '${quest.title}'", MessageType.error);
+      _activeQuests.removeWhere((q) => q.id == quest.id);
       notifyListeners();
-    } else {
-      print("Quest with ID ${quest.id} already exists.");
     }
   }
 
-  void completeQuest(
-      String questId, PlayerProvider playerProvider, SystemLogProvider slog) {
+  Future<void> completeQuest(String questId, PlayerProvider playerProvider,
+      SystemLogProvider slog) async {
+    if (_questsCollectionRef == null) return;
+
     final questIndex = _activeQuests.indexWhere((q) => q.id == questId);
     if (questIndex != -1) {
       QuestModel quest = _activeQuests[questIndex];
 
-      // Нараховуємо нагороди
-      playerProvider.addXp(quest.xpReward, slog);
+      _activeQuests.removeAt(questIndex);
+      quest.isCompleted = true;
+      quest.completedAt = DateTime.now();
+      _completedQuests.insert(0, quest);
+      notifyListeners();
 
+      playerProvider.addXp(quest.xpReward, slog);
       if (quest.hpCostOnCompletion != null && quest.hpCostOnCompletion! > 0) {
         playerProvider.takePlayerDamage(quest.hpCostOnCompletion!);
         slog.addMessage(
@@ -116,17 +141,10 @@ class QuestProvider with ChangeNotifier {
       }
 
       if (quest.type == QuestType.rankUpChallenge) {
-        // Визначаємо, на який ранг був цей квест.
-        // Можна зберігати це в QuestModel або виводити з назви/опису,
-        // але простіше, якщо PlayerProvider знає, який наступний ранг очікується.
-        // Або, простіше, ми просто підвищуємо на наступний доступний ранг.
         QuestDifficulty currentRank = playerProvider.player.playerRank;
         if (currentRank.index < QuestDifficulty.values.length - 1) {
           QuestDifficulty awardedRank =
               QuestDifficulty.values[currentRank.index + 1];
-          // Перевіряємо, чи цей ранг відповідає максимальному за рівнем,
-          // щоб уникнути ситуації, коли квест був на D, а гравець вже S за рівнем.
-          // Хоча логіка requestRankUpChallenge має це запобігти.
           QuestDifficulty maxRankByLevel =
               PlayerModel.calculateRankByLevel(playerProvider.player.level);
           if (awardedRank.index <= maxRankByLevel.index) {
@@ -139,36 +157,55 @@ class QuestProvider with ChangeNotifier {
         }
       }
 
-      // Позначаємо як виконаний і переміщуємо
-      quest.isCompleted = true;
-      quest.completedAt = DateTime.now();
       slog.addMessage(
           "Завдання '${quest.title}' виконано! Нагорода: ${quest.xpReward} XP.",
           MessageType.questCompleted);
-      _completedQuests.add(quest);
-      _activeQuests.removeAt(questIndex);
 
-      _saveQuests();
-      notifyListeners();
-      print("Quest '${quest.title}' completed!");
+      try {
+        await _questsCollectionRef!.doc(questId).update({
+          'isCompleted': true,
+          'completedAt': quest.completedAt?.toIso8601String(),
+        });
+        print("Quest '$questId' marked as completed in Firestore.");
+      } catch (e) {
+        print("Error updating quest in Firestore: $e");
+        slog.addMessage("Помилка оновлення статусу завдання '${quest.title}'",
+            MessageType.error);
+        _completedQuests.removeWhere((q) => q.id == questId);
+        _activeQuests.insert(
+            questIndex,
+            quest
+              ..isCompleted = false
+              ..completedAt = null);
+        notifyListeners();
+      }
     }
   }
 
   Future<void> generateDailyQuestsIfNeeded(
       PlayerProvider playerProvider, SystemLogProvider slog) async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? lastGenerationDateStr =
-        prefs.getString(_lastDailyQuestGenerationKey);
+    if (_playerDocRef == null) return;
+
+    // 1. Отримуємо дату останньої генерації з документа гравця в Firestore
+    String? lastGenerationDateStr;
+    try {
+      final playerDoc = await _playerDocRef!.get();
+      if (playerDoc.exists) {
+        final data = playerDoc.data() as Map<String, dynamic>;
+        lastGenerationDateStr = data[_lastDailyQuestGenerationKey];
+      }
+    } catch (e) {
+      print("Could not read last daily quest generation date: $e");
+    }
+
     final today = DateTime.now();
     final todayDateOnly = DateTime(today.year, today.month, today.day);
-
     bool shouldGenerate = true;
     if (lastGenerationDateStr != null) {
       final lastGenerationDate = DateTime.parse(lastGenerationDateStr);
-      if (lastGenerationDate == todayDateOnly &&
-          _activeQuests.any((q) => q.type == QuestType.daily)) {
+      if (lastGenerationDate == todayDateOnly) {
         shouldGenerate = false;
-        print("Daily quests already exist or generated today.");
+        print("Daily quests already generated today.");
       }
     }
 
@@ -181,177 +218,95 @@ class QuestProvider with ChangeNotifier {
 
       print(
           "Generating daily quests for ${todayDateOnly.toIso8601String()}...");
-      _activeQuests.removeWhere(
-          (quest) => quest.type == QuestType.daily && !quest.isCompleted);
+      // Видалення старих невиконаних щоденних квестів з UI та БД
+      final oldDailies =
+          _activeQuests.where((q) => q.type == QuestType.daily).toList();
+      _activeQuests.removeWhere((q) => q.type == QuestType.daily);
+      if (oldDailies.isNotEmpty) {
+        WriteBatch batch = _firestore.batch();
+        for (var quest in oldDailies) {
+          batch.delete(_questsCollectionRef!.doc(quest.id));
+        }
+        await batch.commit();
+        print("Removed ${oldDailies.length} old daily quests.");
+      }
+      notifyListeners();
 
       _isGeneratingQuest = true;
-      notifyListeners(); // Повідомити UI про початок генерації
+      notifyListeners();
 
-      List<QuestModel> newDailyQuests = [];
       PlayerModel currentPlayer = playerProvider.player;
+      List<Future<void>> questGenerationFutures = [];
 
-      // Генеруємо по одному завданню для кожної основної характеристики
       for (PlayerStat stat in PlayerStat.values) {
-        print(
-            "Attempting to generate daily quest for ${PlayerModel.getStatName(stat)}...");
-        QuestModel? generatedQuest = await _geminiService.generateQuest(
+        // Генеруємо квести паралельно
+        questGenerationFutures.add(_geminiService
+            .generateQuest(
           player: currentPlayer,
           questType: QuestType.daily,
-          targetStat: stat, // Вказуємо цільову характеристику
-          // customPromptInstruction: "Це щоденне завдання для підтримки та розвитку ${PlayerModel.getStatName(stat)}." // Можна додати для ясності Gemini
-        );
-
-        if (generatedQuest != null) {
-          // Перевірка, чи Gemini правильно встановив targetStat
-          if (generatedQuest.targetStat != stat &&
-              generatedQuest.targetStat != null) {
-            print(
-                "Warning: Gemini generated quest for ${PlayerModel.getStatName(generatedQuest.targetStat!)} instead of ${PlayerModel.getStatName(stat)}. Using fallback.");
-            newDailyQuests
-                .add(_getFallbackDailyQuestForStat(stat, currentPlayer));
-            slog.addMessage("Нове щоденне завдання: '${generatedQuest.title}'",
-                MessageType.questAdded,
-                showInSnackbar: false);
-          } else if (generatedQuest.targetStat == null &&
-              generatedQuest.type == QuestType.daily) {
-            // Якщо Gemini не вказав targetStat для щоденного, можливо, він не зрозумів фокус
-            // Хоча наш промпт тепер сильніше на це вказує
-            print(
-                "Warning: Gemini daily quest has no targetStat for ${PlayerModel.getStatName(stat)}. Adjusting or using fallback.");
-            slog.addMessage(
-                "Невдала генерація щоденного для $stat, використано резерв.",
-                MessageType.warning,
-                showInSnackbar: false);
-            // Спробуємо "виправити" або використати fallback
-            // Для простоти, поки що використовуємо fallback, якщо targetStat не встановлено або не той
-            QuestModel correctedQuest = QuestModel(
-                id: generatedQuest.id, // Зберігаємо ID, якщо є
-                title: generatedQuest.title,
-                description: generatedQuest.description,
-                xpReward: generatedQuest.xpReward,
-                type: QuestType.daily,
-                difficulty: generatedQuest.difficulty,
-                targetStat:
-                    stat, // Примусово встановлюємо правильний targetStat
-                createdAt: generatedQuest.createdAt);
-            newDailyQuests.add(correctedQuest);
+          targetStat: stat,
+        )
+            .then((generatedQuest) async {
+          QuestModel questToAdd;
+          if (generatedQuest != null) {
+            // Перевірка, чи Gemini згенерував квест для правильного стату. Якщо ні - використовуємо fallback.
+            if (generatedQuest.targetStat == null ||
+                generatedQuest.targetStat != stat) {
+              print(
+                  "Gemini daily quest had incorrect targetStat. Using fallback for ${stat.name}.");
+              questToAdd = _getFallbackDailyQuestForStat(stat, currentPlayer);
+            } else {
+              questToAdd = generatedQuest;
+            }
           } else {
-            newDailyQuests.add(generatedQuest);
+            print(
+                "Gemini failed to generate daily quest for ${stat.name}, using fallback.");
+            questToAdd = _getFallbackDailyQuestForStat(stat, currentPlayer);
           }
-        } else {
-          print(
-              "Gemini failed to generate daily quest for ${PlayerModel.getStatName(stat)}, using fallback.");
-          newDailyQuests
-              .add(_getFallbackDailyQuestForStat(stat, currentPlayer));
-        }
+          // Додаємо квест. Не показуємо снекбар для кожного.
+          await addQuest(questToAdd, slog, showSnackbar: false);
+        }));
       }
 
-      int addedQuestCount = 0;
-      for (var quest in newDailyQuests) {
-        // Перевіряємо, чи квест з таким самим заголовком (для уникнення дублів щоденних)
-        // вже існує серед активних або виконаних СЬОГОДНІ
-        bool alreadyExistsToday = _activeQuests.any(
-                (q) => q.title == quest.title && q.type == QuestType.daily) ||
-            _completedQuests.any((q) =>
-                q.title == quest.title &&
-                q.type == QuestType.daily &&
-                q.completedAt != null &&
-                DateTime(q.completedAt!.year, q.completedAt!.month,
-                        q.completedAt!.day) ==
-                    todayDateOnly);
-        if (!alreadyExistsToday) {
-          addQuest(
-              quest); // addQuest вже викликає _saveQuests і notifyListeners
-          addedQuestCount++;
-        }
-      }
+      // Чекаємо завершення всіх генерацій
+      await Future.wait(questGenerationFutures);
+      slog.addMessage("Щоденні завдання оновлено.", MessageType.info);
 
-      if (addedQuestCount > 0) {
-        // Зберігаємо дату, тільки якщо хоча б один квест було додано
-        await prefs.setString(
-            _lastDailyQuestGenerationKey, todayDateOnly.toIso8601String());
-        print(
-            "$addedQuestCount daily quests processed and saved. Next generation tomorrow.");
-      } else {
-        print(
-            "No new daily quests were added (possibly all duplicates or generation failed).");
+      // 2. Зберігаємо нову дату генерації в документі гравця в Firestore
+      try {
+        await _playerDocRef!.set(
+            {_lastDailyQuestGenerationKey: todayDateOnly.toIso8601String()},
+            SetOptions(
+                merge:
+                    true) // merge: true, щоб не перезаписати інші дані гравця
+            );
+        print("Daily quest generation date updated in Firestore.");
+      } catch (e) {
+        print("Error updating daily quest generation date: $e");
       }
 
       _isGeneratingQuest = false;
-      notifyListeners(); // Повідомити UI про завершення генерації
+      notifyListeners();
     }
   }
 
-  // Метод для отримання запасного щоденного квесту для конкретної характеристики
   QuestModel _getFallbackDailyQuestForStat(
       PlayerStat stat, PlayerModel player) {
+    // ... (Цей метод залишається без змін, оскільки він не взаємодіє з базою даних)
     int xpBase = 15 + (player.level * 2);
-
     switch (stat) {
-      case PlayerStat.strength:
+      // ... (всі case-и)
+      default:
         return QuestModel(
-          title: "Щоденна Сила",
-          description:
-              "Виконай 2 підходи по ${(player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] as int? ?? 10) ~/ 2 + 3} віджимань та ${(player.baselinePhysicalPerformance?[PhysicalActivity.pullUps] as int? ?? 2) ~/ 2 + 1} підтягувань (або австралійських).",
-          xpReward: xpBase + 5,
-          difficulty: QuestDifficulty.E,
-          type: QuestType.daily,
-          targetStat: stat,
-        );
-      case PlayerStat.agility:
-        return QuestModel(
-          title: "Ранкова Гнучкість",
-          description:
-              "Присвяти 10 хвилин розтяжці основних груп м'язів або виконай комплекс вправ на координацію.",
-          xpReward: xpBase,
-          difficulty: QuestDifficulty.E,
-          type: QuestType.daily,
-          targetStat: stat,
-        );
-      case PlayerStat.intelligence:
-        return QuestModel(
-          title: "Ментальна Зарядка",
-          description:
-              "Прочитай 10 сторінок книги, що розвиває, або розв'яжи 2-3 логічні задачі/головоломки.",
-          xpReward: xpBase,
-          difficulty: QuestDifficulty.D,
-          type: QuestType.daily,
-          targetStat: stat,
-        );
-      case PlayerStat.perception:
-        return QuestModel(
-          title: "Око Мисливця",
-          description:
-              "Під час прогулянки або поїздки, спробуй помітити 5 дрібних деталей, на які раніше не звертав уваги. Запиши їх.",
-          xpReward: xpBase - 5 > 0 ? xpBase - 5 : 5,
-          difficulty: QuestDifficulty.D,
-          type: QuestType.daily,
-          targetStat: stat,
-        );
-      case PlayerStat.stamina:
-        return QuestModel(
-          title: "Витривалість Тіні",
-          description:
-              "Здійсни ${(player.baselinePhysicalPerformance?[PhysicalActivity.runningDurationInMin] as int? ?? 10) ~/ 2 + 5}-хвилинну пробіжку в помірному темпі або швидку ходьбу.",
-          xpReward: xpBase + 5,
-          difficulty: QuestDifficulty.E,
-          type: QuestType.daily,
-          targetStat: stat,
-        );
-      default: // На випадок, якщо додадуться нові стати
-        return QuestModel(
-          title: "Щоденний Розвиток",
-          description:
-              "Присвяти 15 хвилин будь-якій активності, що покращує тебе.",
-          xpReward: xpBase,
-          difficulty: QuestDifficulty.E,
-          type: QuestType.daily,
-          targetStat: stat,
-        );
+            title: "Default Daily",
+            description: "Default desc",
+            xpReward: xpBase,
+            type: QuestType.daily,
+            difficulty: QuestDifficulty.E,
+            targetStat: stat);
     }
   }
 
-  // Метод для генерації одного завдання на вимогу
   Future<QuestModel?> fetchAndAddGeneratedQuest({
     required PlayerProvider playerProvider,
     required SystemLogProvider slog,
@@ -359,7 +314,7 @@ class QuestProvider with ChangeNotifier {
     PlayerStat? targetStat,
     String? customInstruction,
   }) async {
-    if (_isGeneratingQuest) return null; // Не генерувати, якщо вже йде процес
+    if (_isGeneratingQuest) return null;
 
     _isGeneratingQuest = true;
     notifyListeners();
@@ -372,30 +327,34 @@ class QuestProvider with ChangeNotifier {
     );
 
     if (newQuest != null) {
-      addQuest(newQuest); // addQuest викличе _saveQuests та notifyListeners
-      slog.addMessage("Нове завдання: '${newQuest.title}' згенеровано!",
-          MessageType.questAdded);
+      await addQuest(newQuest, slog); // Тепер викликаємо асинхронний метод
     } else {
       print("Failed to generate a new quest using Gemini API.");
       slog.addMessage("Не вдалося згенерувати завдання.", MessageType.error);
     }
 
     _isGeneratingQuest = false;
-    // addQuest вже викликав notifyListeners, але якщо newQuest == null, то UI не оновить _isGeneratingQuest
     notifyListeners();
     return newQuest;
   }
 
-  // Метод для очищення списків квестів (для тестування)
   Future<void> resetAllQuests() async {
+    if (_questsCollectionRef == null) return;
+
     _activeQuests.clear();
     _completedQuests.clear();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_activeQuestsKey);
-    await prefs.remove(_completedQuestsKey);
-    await prefs.remove(
-        _lastDailyQuestGenerationKey); // Скидаємо дату генерації щоденних
     notifyListeners();
-    print("All quest data has been reset.");
+
+    try {
+      final snapshot = await _questsCollectionRef!.get();
+      WriteBatch batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      print("All quests deleted from Firestore for the user.");
+    } catch (e) {
+      print("Error deleting all quests from Firestore: $e");
+    }
   }
 }

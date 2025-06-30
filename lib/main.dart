@@ -1,21 +1,53 @@
-// lib/main.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/player_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'providers/quest_provider.dart'; // Імпортуємо QuestProvider
-import 'providers/system_log_provider.dart'; // Якщо потрібно, але поки не використовуємо
-import 'screens/splash_screen.dart'; // Створимо простий сплеш-скрін
+import 'package:firebase_auth/firebase_auth.dart';
+import 'providers/quest_provider.dart';
+import 'providers/system_log_provider.dart';
+import 'screens/splash_screen.dart';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  final playerProvider = PlayerProvider();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(value: playerProvider),
-        ChangeNotifierProvider(create: (_) => QuestProvider()),
+        Provider<FirebaseAuth>(
+          create: (_) => FirebaseAuth.instance,
+        ),
+        ChangeNotifierProxyProvider<FirebaseAuth, PlayerProvider>(
+          create: (context) => PlayerProvider(null, null),
+          update: (context, auth, previousPlayerProvider) {
+            if (previousPlayerProvider != null) {
+              previousPlayerProvider.update(auth, null);
+              return previousPlayerProvider;
+            }
+            return PlayerProvider(auth, null);
+          },
+        ),
+        ChangeNotifierProxyProvider<PlayerProvider, QuestProvider>(
+          create: (context) => QuestProvider(),
+          update: (context, playerProvider, previousQuestProvider) {
+            if (previousQuestProvider != null) {
+              previousQuestProvider.update(playerProvider);
+              return previousQuestProvider;
+            }
+            return QuestProvider();
+          },
+        ),
         ChangeNotifierProvider(create: (_) => SystemLogProvider()),
       ],
       child: const MyApp(),
