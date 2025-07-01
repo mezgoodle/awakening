@@ -127,7 +127,11 @@ class PlayerProvider with ChangeNotifier {
 
     for (String skillId in _player!.learnedSkillIds) {
       final skill = _skillProvider!.getSkillById(skillId);
-      if (skill != null && skill.skillType == SkillType.passive) {
+      if (skill == null) {
+        print("Warning: Learned skill $skillId not found in skill provider");
+        continue;
+      }
+      if (skill.skillType == SkillType.passive) {
         skill.effects.forEach((effectType, value) {
           switch (effectType) {
             case SkillEffectType.addStrength:
@@ -139,13 +143,13 @@ class PlayerProvider with ChangeNotifier {
                   (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
               break;
             case SkillEffectType.multiplyMaxHp:
-              maxHpMultiplier += value / 100.0;
+              maxHpMultiplier *= (1 + value / 100.0);
               break;
             case SkillEffectType.multiplyMaxMp:
-              maxMpMultiplier += value / 100.0;
+              maxMpMultiplier *= (1 + value / 100.0);
               break;
             case SkillEffectType.multiplyXpGain:
-              xpGainMultiplier += value / 100.0;
+              xpGainMultiplier *= (1 + value / 100.0);
               break;
             default:
               break;

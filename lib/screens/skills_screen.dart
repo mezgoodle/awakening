@@ -137,8 +137,8 @@ class SkillCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  // Icon(Icons.star, color: borderColor), // Заглушка для іконки
-                  // const SizedBox(width: 10),
+                  Icon(Icons.star, color: borderColor),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(skill.name,
                         style: const TextStyle(

@@ -13,7 +13,7 @@ class SkillProvider with ChangeNotifier {
       skillType: SkillType.passive,
       levelRequirement: 5,
       statRequirements: {PlayerStat.stamina: 10},
-      effects: {SkillEffectType.addStrength: 5.0},
+      effects: {SkillEffectType.multiplyMaxHp: 5.0},
     ),
     SkillModel(
       id: 'passive_focus_1',
