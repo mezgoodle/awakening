@@ -122,6 +122,11 @@ class SkillCard extends StatelessWidget {
         ? Colors.amberAccent
         : (canLearn ? Colors.greenAccent : Colors.grey[700]!);
 
+    final cooldownEndTime = playerProvider.getSkillCooldownEndTime(skill.id);
+    final bool isOnCooldown =
+        cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now());
+    final bool isBuffActive = player.activeBuffs.containsKey(skill.id);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12.0),
       shape: RoundedRectangleBorder(
@@ -144,6 +149,18 @@ class SkillCard extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
+                  if (isLearned &&
+                      skill.skillType == SkillType.activeBuff &&
+                      !isBuffActive &&
+                      !isOnCooldown)
+                    ElevatedButton(
+                      onPressed: () {
+                        playerProvider.activateSkill(skill.id, slog);
+                      },
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700]),
+                      child: Text('Активувати (${skill.mpCost?.toInt()} MP)'),
+                    ),
                   if (canLearn)
                     ElevatedButton(
                       onPressed: () {
@@ -153,13 +170,24 @@ class SkillCard extends StatelessWidget {
                           backgroundColor: Colors.green[700]),
                       child: Text('Вивчити (${skill.skillPointCost})'),
                     ),
-                  if (isLearned)
+                  if (isLearned &&
+                      (skill.skillType == SkillType.passive || isBuffActive))
                     const Icon(Icons.check_circle, color: Colors.amberAccent),
                 ],
               ),
               const SizedBox(height: 8),
               Text(skill.description,
                   style: TextStyle(color: Colors.grey[300])),
+              if (isLearned &&
+                  skill.skillType == SkillType.activeBuff &&
+                  isOnCooldown)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    'Перезарядка: ${cooldownEndTime.difference(DateTime.now()).inMinutes} хв. ${cooldownEndTime.difference(DateTime.now()).inSeconds % 60} сек.',
+                    style: TextStyle(color: Colors.redAccent[100]),
+                  ),
+                ),
               const SizedBox(height: 10),
               if (isLocked) _buildRequirements(context, skill, player),
             ],

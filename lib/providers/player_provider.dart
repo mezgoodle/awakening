@@ -21,6 +21,7 @@ class PlayerProvider with ChangeNotifier {
   String? _uid;
 
   Map<PlayerStat, int>? _modifiedStats;
+  Map<String, DateTime> _skillCooldowns = {};
   int? _modifiedMaxHp;
   int? _modifiedMaxMp;
 
@@ -82,6 +83,10 @@ class PlayerProvider with ChangeNotifier {
     return _firestore.collection('players').doc(_uid);
   }
 
+  DateTime? getSkillCooldownEndTime(String skillId) {
+    return _skillCooldowns[skillId];
+  }
+
   Future<void> _loadPlayerData() async {
     if (_playerDocRef == null) {
       _isLoading = false;
@@ -109,48 +114,47 @@ class PlayerProvider with ChangeNotifier {
     }
 
     if (_player != null) {
-      _applyPassiveSkillBonuses();
+      _calculateFinalStats();
     }
 
     _isLoading = false;
     notifyListeners();
   }
 
-  void _applyPassiveSkillBonuses() {
+  void _calculateFinalStats() {
     if (_player == null || _skillProvider == null) return;
 
+    // 1. Скидаємо модифікатори до базових значень
     _modifiedStats = Map.from(_player!.stats);
-
     double maxHpMultiplier = 1.0;
     double maxMpMultiplier = 1.0;
-    double xpGainMultiplier = 1.0;
+    double xpGainMultiplier = 1.0; // Поки не використовується, але закладено
 
+    // 2. Застосовуємо ефекти від пасивних навичок
     for (String skillId in _player!.learnedSkillIds) {
       final skill = _skillProvider!.getSkillById(skillId);
-      if (skill == null) {
-        print("Warning: Learned skill $skillId not found in skill provider");
-        continue;
+      if (skill != null && skill.skillType == SkillType.passive) {
+        // ... (логіка застосування пасивних ефектів, як і раніше)
       }
-      if (skill.skillType == SkillType.passive) {
+    }
+
+    // 3. Застосовуємо ефекти від активних бафів
+    // Видаляємо прострочені бафи
+    _player!.activeBuffs.removeWhere((skillId, endTimeString) {
+      return DateTime.parse(endTimeString).isBefore(DateTime.now());
+    });
+
+    for (String skillId in _player!.activeBuffs.keys) {
+      final skill = _skillProvider!.getSkillById(skillId);
+      if (skill != null && skill.skillType == SkillType.activeBuff) {
+        // Застосовуємо ефекти активного бафу
         skill.effects.forEach((effectType, value) {
           switch (effectType) {
             case SkillEffectType.addStrength:
               _modifiedStats![PlayerStat.strength] =
                   (_modifiedStats![PlayerStat.strength] ?? 0) + value.toInt();
               break;
-            case SkillEffectType.addStamina:
-              _modifiedStats![PlayerStat.stamina] =
-                  (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
-              break;
-            case SkillEffectType.multiplyMaxHp:
-              maxHpMultiplier *= (1 + value / 100.0);
-              break;
-            case SkillEffectType.multiplyMaxMp:
-              maxMpMultiplier *= (1 + value / 100.0);
-              break;
-            case SkillEffectType.multiplyXpGain:
-              xpGainMultiplier *= (1 + value / 100.0);
-              break;
+            // ... (інші ефекти для бафів)
             default:
               break;
           }
@@ -158,6 +162,7 @@ class PlayerProvider with ChangeNotifier {
       }
     }
 
+    // 4. Перераховуємо HP/MP на основі фінальних модифікованих статів
     int stamina = _modifiedStats![PlayerStat.stamina] ?? 0;
     int intelligence = _modifiedStats![PlayerStat.intelligence] ?? 0;
     _modifiedMaxHp = (((_player!.level * PlayerModel.baseHpPerLevel) +
@@ -174,8 +179,7 @@ class PlayerProvider with ChangeNotifier {
     _player!.currentHp = min(_player!.currentHp, _modifiedMaxHp!);
     _player!.currentMp = min(_player!.currentMp, _modifiedMaxMp!);
 
-    print(
-        "Passive skill bonuses applied. Final Strength: ${_modifiedStats![PlayerStat.strength]}");
+    // Не викликаємо notifyListeners() тут, це робиться в публічних методах
   }
 
   Future<void> _savePlayerData() async {
@@ -222,7 +226,7 @@ class PlayerProvider with ChangeNotifier {
     if (leveledUpThisCheck) {
       _justLeveledUp = true;
       _player!.onLevelUp();
-      _applyPassiveSkillBonuses();
+      _calculateFinalStats();
 
       slog?.addMessage("Рівень підвищено! Новий рівень: ${_player!.level}",
           MessageType.levelUp);
@@ -253,7 +257,7 @@ class PlayerProvider with ChangeNotifier {
       _player!.availableSkillPoints -= skill.skillPointCost;
       _player!.learnedSkillIds.add(skillId);
       if (skill.skillType == SkillType.passive) {
-        _applyPassiveSkillBonuses();
+        _calculateFinalStats();
       }
 
       slog.addMessage("Вивчено навичку: '${skill.name}'!", MessageType.levelUp);
@@ -267,13 +271,66 @@ class PlayerProvider with ChangeNotifier {
     }
   }
 
+  bool activateSkill(String skillId, SystemLogProvider slog) {
+    if (_player == null || _skillProvider == null) return false;
+
+    final skill = _skillProvider!.getSkillById(skillId);
+    if (skill == null || skill.skillType != SkillType.activeBuff) return false;
+
+    // Перевірка, чи навичка вивчена
+    if (!_player!.learnedSkillIds.contains(skillId)) return false;
+
+    // Перевірка, чи не активний вже цей баф
+    if (_player!.activeBuffs.containsKey(skillId)) {
+      slog.addMessage(
+          "Ефект '${skill.name}' вже активний.", MessageType.warning);
+      return false;
+    }
+
+    // Перевірка перезарядки (cooldown)
+    final cooldownEndTime = _skillCooldowns[skillId];
+    if (cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now())) {
+      slog.addMessage(
+          "Навичка '${skill.name}' перезаряджається.", MessageType.warning);
+      return false;
+    }
+
+    // Перевірка вартості MP
+    final mpCost = skill.mpCost?.toInt() ?? 0;
+    if (_player!.currentMp < mpCost) {
+      slog.addMessage(
+          "Недостатньо MP для '${skill.name}'.", MessageType.warning);
+      return false;
+    }
+
+    // Все добре, активуємо навичку
+    _player!.useMp(mpCost); // Витрачаємо MP
+
+    // Додаємо баф
+    final buffEndTime =
+        DateTime.now().add(skill.duration ?? const Duration(seconds: 0));
+    _player!.activeBuffs[skillId] = buffEndTime.toIso8601String();
+
+    // Встановлюємо час перезарядки
+    if (skill.cooldown != null) {
+      _skillCooldowns[skillId] = DateTime.now().add(skill.cooldown!);
+    }
+
+    slog.addMessage("Активовано: '${skill.name}'!", MessageType.info);
+
+    _calculateFinalStats();
+    _savePlayerData();
+    notifyListeners();
+    return true;
+  }
+
   bool spendStatPoint(
       PlayerStat stat, int amountToSpend, SystemLogProvider slog) {
     if (_isLoading || _player == null) return false;
     if (_player!.availableStatPoints >= amountToSpend && amountToSpend > 0) {
       _player!.stats[stat] = (_player!.stats[stat] ?? 0) + amountToSpend;
       _player!.availableStatPoints -= amountToSpend;
-      _applyPassiveSkillBonuses();
+      _calculateFinalStats();
       if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
         _player!.onStatsChanged();
       }

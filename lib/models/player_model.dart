@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'quest_model.dart';
 
-// Перелік для можливих характеристик
 enum PlayerStat {
   strength, // Сила
   agility, // Спритність
@@ -27,6 +26,7 @@ class PlayerModel {
   int availableSkillPoints;
   List<String> learnedSkillIds;
   Map<PhysicalActivity, dynamic>? baselinePhysicalPerformance;
+  Map<String, String> activeBuffs;
   bool initialSurveyCompleted;
   late QuestDifficulty playerRank;
 
@@ -45,6 +45,7 @@ class PlayerModel {
       this.level = 1,
       this.xp = 0,
       Map<PlayerStat, int>? initialStats,
+      Map<String, String>? initialActiveBuffs,
       this.availableStatPoints = 0,
       this.availableSkillPoints = 0,
       this.baselinePhysicalPerformance,
@@ -54,6 +55,7 @@ class PlayerModel {
       int? loadedCurrentMp,
       List<String>? initialLearnedSkillIds})
       : learnedSkillIds = initialLearnedSkillIds ?? [],
+        activeBuffs = initialActiveBuffs ?? {},
         stats = initialStats ??
             {
               PlayerStat.strength: 5,
@@ -164,6 +166,7 @@ class PlayerModel {
         (key, value) => MapEntry(key.name, value),
       ),
       'initialSurveyCompleted': initialSurveyCompleted,
+      'activeBuffs': activeBuffs,
       'playerRank': playerRank.name,
       'maxHp': maxHp,
       'currentHp': currentHp,
@@ -215,6 +218,8 @@ class PlayerModel {
       availableSkillPoints: json['availableSkillPoints'] as int? ?? 0,
       initialLearnedSkillIds:
           (json['learnedSkillIds'] as List<dynamic>?)?.cast<String>() ?? [],
+      initialActiveBuffs: (json['activeBuffs'] as Map<String, dynamic>?)
+          ?.cast<String, String>(),
       initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       playerRank: json['playerRank'] != null &&
               (json['playerRank'] as String).isNotEmpty

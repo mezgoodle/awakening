@@ -49,9 +49,9 @@ class SkillProvider with ChangeNotifier {
       description:
           'На короткий час ви наповнюєтесь силою. +5 до Сили на 10 хвилин.',
       skillType: SkillType.activeBuff,
-      levelRequirement: 12,
-      statRequirements: {PlayerStat.strength: 25, PlayerStat.intelligence: 10},
-      skillPointCost: 2,
+      levelRequirement: 2,
+      statRequirements: {PlayerStat.strength: 2, PlayerStat.intelligence: 2},
+      skillPointCost: 1,
       mpCost: 15.0,
       duration: const Duration(minutes: 10),
       cooldown: const Duration(hours: 1),
