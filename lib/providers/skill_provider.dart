@@ -1,5 +1,4 @@
-// lib/providers/skill_provider.dart
-
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import '../models/skill_model.dart';
 import '../models/player_model.dart';
@@ -62,11 +61,7 @@ class SkillProvider with ChangeNotifier {
   List<SkillModel> get allSkills => _allSkills;
 
   SkillModel? getSkillById(String id) {
-    try {
-      return _allSkills.firstWhere((skill) => skill.id == id);
-    } catch (e) {
-      return null;
-    }
+    return _allSkills.firstWhereOrNull((skill) => skill.id == id);
   }
 
   bool canLearnSkill(

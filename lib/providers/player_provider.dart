@@ -128,18 +128,39 @@ class PlayerProvider with ChangeNotifier {
     _modifiedStats = Map.from(_player!.stats);
     double maxHpMultiplier = 1.0;
     double maxMpMultiplier = 1.0;
-    double xpGainMultiplier = 1.0; // Поки не використовується, але закладено
+    double xpGainMultiplier = 1.0;
 
     // 2. Застосовуємо ефекти від пасивних навичок
     for (String skillId in _player!.learnedSkillIds) {
       final skill = _skillProvider!.getSkillById(skillId);
       if (skill != null && skill.skillType == SkillType.passive) {
-        // ... (логіка застосування пасивних ефектів, як і раніше)
+        skill.effects.forEach((effectType, value) {
+          switch (effectType) {
+            case SkillEffectType.addStrength:
+              _modifiedStats![PlayerStat.strength] =
+                  (_modifiedStats![PlayerStat.strength] ?? 0) + value.toInt();
+              break;
+            case SkillEffectType.addStamina:
+              _modifiedStats![PlayerStat.stamina] =
+                  (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
+              break;
+            case SkillEffectType.multiplyMaxHp:
+              maxHpMultiplier += (1 + value / 100.0);
+              break;
+            case SkillEffectType.multiplyMaxMp:
+              maxMpMultiplier += (1 + value / 100.0);
+              break;
+            case SkillEffectType.multiplyXpGain:
+              xpGainMultiplier += (1 + value / 100.0);
+              break;
+            default:
+              break;
+          }
+        });
       }
     }
 
     // 3. Застосовуємо ефекти від активних бафів
-    // Видаляємо прострочені бафи
     _player!.activeBuffs.removeWhere((skillId, endTimeString) {
       return DateTime.parse(endTimeString).isBefore(DateTime.now());
     });
@@ -154,7 +175,19 @@ class PlayerProvider with ChangeNotifier {
               _modifiedStats![PlayerStat.strength] =
                   (_modifiedStats![PlayerStat.strength] ?? 0) + value.toInt();
               break;
-            // ... (інші ефекти для бафів)
+            case SkillEffectType.addStamina:
+              _modifiedStats![PlayerStat.stamina] =
+                  (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
+              break;
+            case SkillEffectType.multiplyMaxHp:
+              maxHpMultiplier += (1 + value / 100.0);
+              break;
+            case SkillEffectType.multiplyMaxMp:
+              maxMpMultiplier += (1 + value / 100.0);
+              break;
+            case SkillEffectType.multiplyXpGain:
+              xpGainMultiplier += (1 + value / 100.0);
+              break;
             default:
               break;
           }

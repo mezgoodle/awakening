@@ -1,4 +1,4 @@
-import 'package:awakening/models/player_model.dart';
+import 'player_model.dart';
 
 enum SkillType {
   passive,
