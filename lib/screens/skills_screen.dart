@@ -1,5 +1,3 @@
-// lib/screens/skills_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
@@ -14,10 +12,10 @@ class SkillsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final playerProvider = context.watch<PlayerProvider>();
-    final skillProvider = context.read<SkillProvider>();
+    final skillProvider = context.watch<SkillProvider>();
     final slog = context.read<SystemLogProvider>();
 
-    if (playerProvider.isLoading) {
+    if (playerProvider.isLoading || skillProvider.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
