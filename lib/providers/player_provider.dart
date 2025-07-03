@@ -145,13 +145,13 @@ class PlayerProvider with ChangeNotifier {
                   (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
               break;
             case SkillEffectType.multiplyMaxHp:
-              maxHpMultiplier += (1 + value / 100.0);
+              maxHpMultiplier *= (1 + value / 100.0);
               break;
             case SkillEffectType.multiplyMaxMp:
-              maxMpMultiplier += (1 + value / 100.0);
+              maxMpMultiplier *= (1 + value / 100.0);
               break;
             case SkillEffectType.multiplyXpGain:
-              xpGainMultiplier += (1 + value / 100.0);
+              xpGainMultiplier *= (1 + value / 100.0);
               break;
             default:
               break;
@@ -180,13 +180,13 @@ class PlayerProvider with ChangeNotifier {
                   (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
               break;
             case SkillEffectType.multiplyMaxHp:
-              maxHpMultiplier += (1 + value / 100.0);
+              maxHpMultiplier *= (1 + value / 100.0);
               break;
             case SkillEffectType.multiplyMaxMp:
-              maxMpMultiplier += (1 + value / 100.0);
+              maxMpMultiplier *= (1 + value / 100.0);
               break;
             case SkillEffectType.multiplyXpGain:
-              xpGainMultiplier += (1 + value / 100.0);
+              xpGainMultiplier *= (1 + value / 100.0);
               break;
             default:
               break;
