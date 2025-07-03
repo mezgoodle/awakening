@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'quest_model.dart';
 
-// Перелік для можливих характеристик
 enum PlayerStat {
   strength, // Сила
   agility, // Спритність
@@ -24,7 +23,10 @@ class PlayerModel {
   late int xpToNextLevel;
   Map<PlayerStat, int> stats;
   int availableStatPoints;
+  int availableSkillPoints;
+  List<String> learnedSkillIds;
   Map<PhysicalActivity, dynamic>? baselinePhysicalPerformance;
+  Map<String, String> activeBuffs;
   bool initialSurveyCompleted;
   late QuestDifficulty playerRank;
 
@@ -38,18 +40,23 @@ class PlayerModel {
   static const int baseMpPerLevel = 5;
   static const int mpPerIntelligencePoint = 3;
 
-  PlayerModel({
-    this.playerName = "Мисливець",
-    this.level = 1,
-    this.xp = 0,
-    Map<PlayerStat, int>? initialStats,
-    this.availableStatPoints = 0,
-    this.baselinePhysicalPerformance,
-    this.initialSurveyCompleted = false,
-    this.playerRank = QuestDifficulty.F,
-    int? loadedCurrentHp,
-    int? loadedCurrentMp,
-  }) : stats = initialStats ??
+  PlayerModel(
+      {this.playerName = "Мисливець",
+      this.level = 1,
+      this.xp = 0,
+      Map<PlayerStat, int>? initialStats,
+      Map<String, String>? initialActiveBuffs,
+      this.availableStatPoints = 0,
+      this.availableSkillPoints = 0,
+      this.baselinePhysicalPerformance,
+      this.initialSurveyCompleted = false,
+      this.playerRank = QuestDifficulty.F,
+      int? loadedCurrentHp,
+      int? loadedCurrentMp,
+      List<String>? initialLearnedSkillIds})
+      : learnedSkillIds = initialLearnedSkillIds ?? [],
+        activeBuffs = initialActiveBuffs ?? {},
+        stats = initialStats ??
             {
               PlayerStat.strength: 5,
               PlayerStat.agility: 5,
@@ -153,10 +160,13 @@ class PlayerModel {
       'xpToNextLevel': xpToNextLevel,
       'stats': stats.map((key, value) => MapEntry(key.name, value)),
       'availableStatPoints': availableStatPoints,
+      'availableSkillPoints': availableSkillPoints,
+      'learnedSkillIds': learnedSkillIds,
       'baselinePhysicalPerformance': baselinePhysicalPerformance?.map(
         (key, value) => MapEntry(key.name, value),
       ),
       'initialSurveyCompleted': initialSurveyCompleted,
+      'activeBuffs': activeBuffs,
       'playerRank': playerRank.name,
       'maxHp': maxHp,
       'currentHp': currentHp,
@@ -205,6 +215,11 @@ class PlayerModel {
       xp: json['xp'] as int? ?? 0,
       initialStats: loadedStats,
       availableStatPoints: json['availableStatPoints'] as int? ?? 0,
+      availableSkillPoints: json['availableSkillPoints'] as int? ?? 0,
+      initialLearnedSkillIds:
+          (json['learnedSkillIds'] as List<dynamic>?)?.cast<String>() ?? [],
+      initialActiveBuffs: (json['activeBuffs'] as Map<String, dynamic>?)
+          ?.cast<String, String>(),
       initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       playerRank: json['playerRank'] != null &&
               (json['playerRank'] as String).isNotEmpty

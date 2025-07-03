@@ -1,4 +1,4 @@
-// lib/screens/player_status_screen.dart
+import 'package:awakening/providers/skill_provider.dart';
 import 'package:awakening/providers/system_log_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -164,19 +164,13 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Використовуємо Selector для перебудови лише при зміні конкретних полів, якщо потрібно оптимізувати
-    // Або context.watch для простоти
     final playerProvider = context.watch<PlayerProvider>();
-    final questProvider = context.read<QuestProvider>(); // Для кнопки запиту
-    final systemLogProvider =
-        context.read<SystemLogProvider>(); // Для передачі в методи
+    final skillProvider = context.read<SkillProvider>();
+    final questProvider = context.read<QuestProvider>();
+    final systemLogProvider = context.read<SystemLogProvider>();
 
-    // Перевірка на підвищення рівня і показ SnackBar
-    // WidgetsBinding.instance.addPostFrameCallback гарантує, що SnackBar
-    // показується після того, як фрейм вже побудований.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (playerProvider.justLeveledUp && mounted) {
-        // mounted - перевірка, що віджет ще в дереві
         _showLevelUpSnackBar(context);
       }
     });
@@ -193,6 +187,10 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     }
 
     final player = playerProvider.player;
+
+    final finalStats = playerProvider.finalStats;
+    final finalMaxHp = playerProvider.finalMaxHp;
+    final finalMaxMp = playerProvider.finalMaxMp;
 
     QuestDifficulty nextPotentialRankByLevel =
         PlayerModel.calculateRankByLevel(player.level);
@@ -313,10 +311,12 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             ),
             _buildInfoCard('Рівень:', '${player.level}'),
             const SizedBox(height: 16),
-            _buildResourceBar("HP", player.currentHp, player.maxHp,
+            _buildActiveBuffsSection(player, skillProvider),
+            const SizedBox(height: 16),
+            _buildResourceBar("HP", player.currentHp, finalMaxHp,
                 Colors.redAccent[400]!, Icons.favorite_rounded),
             const SizedBox(height: 12),
-            _buildResourceBar("MP", player.currentMp, player.maxMp,
+            _buildResourceBar("MP", player.currentMp, finalMaxMp,
                 Colors.blueAccent[400]!, Icons.flash_on_rounded),
             const SizedBox(height: 20),
             Text(
@@ -346,14 +346,20 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            ...player.stats.entries.map((entry) {
+            ...finalStats.entries.map((entry) {
+              final baseValue = player.stats[entry.key] ?? 0;
+              final finalValue = entry.value;
+              final bonus = finalValue - baseValue;
               final slog = context.read<SystemLogProvider>();
               return _buildStatRow(
                 PlayerModel.getStatName(entry.key),
                 entry.value,
                 context,
-                canIncrease: false,
-                onIncrease: () {},
+                bonus: bonus,
+                canIncrease: true,
+                onIncrease: () {
+                  playerProvider.spendStatPoint(entry.key, 1, slog);
+                },
               );
             }).toList(),
             const SizedBox(height: 30),
@@ -401,6 +407,38 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     );
   }
 
+  Widget _buildActiveBuffsSection(
+      PlayerModel player, SkillProvider skillProvider) {
+    if (player.activeBuffs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    List<Widget> buffWidgets = [];
+    player.activeBuffs.forEach((skillId, endTimeString) {
+      final skill = skillProvider.getSkillById(skillId);
+      final endTime = DateTime.parse(endTimeString);
+      if (skill != null) {
+        buffWidgets.add(Chip(
+          avatar: const Icon(Icons.arrow_upward, color: Colors.greenAccent),
+          label: Text(
+            '${skill.name} (${endTime.difference(DateTime.now()).inMinutes}:${(endTime.difference(DateTime.now()).inSeconds % 60).toString().padLeft(2, '0')})',
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.white12,
+        ));
+      }
+    });
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Wrap(
+        spacing: 8.0,
+        runSpacing: 4.0,
+        children: buffWidgets,
+      ),
+    );
+  }
+
   Widget _buildInfoCard(String label, String value, {Widget? actionWidget}) {
     return Card(
       color: const Color(0xFF2A2A2A),
@@ -434,7 +472,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
   }
 
   Widget _buildStatRow(String statName, int statValue, BuildContext context,
-      {bool canIncrease = false, VoidCallback? onIncrease}) {
+      {int bonus = 0, bool canIncrease = false, VoidCallback? onIncrease}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
@@ -452,6 +490,14 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                       .textTheme
                       .bodyLarge
                       ?.copyWith(fontSize: 16, fontWeight: FontWeight.bold)),
+              if (bonus > 0)
+                Text(
+                  ' (+${bonus})',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.greenAccent[400]),
+                ),
               if (canIncrease && onIncrease != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 12.0),
@@ -460,8 +506,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                         color: Colors.lightBlueAccent[100]),
                     iconSize: 20,
                     padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(), // щоб іконка була маленькою
+                    constraints: const BoxConstraints(),
                     tooltip: 'Збільшити ${statName.toLowerCase()}',
                     onPressed: onIncrease,
                   ),

@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'providers/quest_provider.dart';
 import 'providers/system_log_provider.dart';
+import 'providers/skill_provider.dart';
 import 'screens/splash_screen.dart';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -28,14 +29,16 @@ Future<void> main() async {
         Provider<FirebaseAuth>(
           create: (_) => FirebaseAuth.instance,
         ),
-        ChangeNotifierProxyProvider<FirebaseAuth, PlayerProvider>(
-          create: (context) => PlayerProvider(null, null),
-          update: (context, auth, previousPlayerProvider) {
+        ChangeNotifierProvider(create: (_) => SkillProvider()),
+        ChangeNotifierProxyProvider2<FirebaseAuth, SkillProvider,
+            PlayerProvider>(
+          create: (context) => PlayerProvider(null, null, null),
+          update: (context, auth, skillProvider, previousPlayerProvider) {
             if (previousPlayerProvider != null) {
-              previousPlayerProvider.update(auth, null);
+              previousPlayerProvider.update(auth, skillProvider, null);
               return previousPlayerProvider;
             }
-            return PlayerProvider(auth, null);
+            return PlayerProvider(auth, skillProvider, null);
           },
         ),
         ChangeNotifierProxyProvider<PlayerProvider, QuestProvider>(
