@@ -1,64 +1,75 @@
 import 'package:collection/collection.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/skill_model.dart';
 import '../models/player_model.dart';
 
 class SkillProvider with ChangeNotifier {
-  final List<SkillModel> _allSkills = [
-    SkillModel(
-      id: 'passive_toughness_1',
-      name: 'Фізична Закалка I',
-      description: 'Ваше тіло стає міцнішим. +5% до максимального HP.',
-      skillType: SkillType.passive,
-      levelRequirement: 5,
-      statRequirements: {PlayerStat.stamina: 10},
-      effects: {SkillEffectType.multiplyMaxHp: 5.0},
-    ),
-    SkillModel(
-      id: 'passive_focus_1',
-      name: 'Ментальний Фокус I',
-      description: 'Ваш розум стає гострішим. +5% до максимального MP.',
-      skillType: SkillType.passive,
-      levelRequirement: 5,
-      statRequirements: {PlayerStat.intelligence: 10},
-      effects: {SkillEffectType.multiplyMaxMp: 5.0},
-    ),
-    SkillModel(
-      id: 'passive_swift_learner_1',
-      name: 'Швидке Навчання I',
-      description: 'Ви швидше засвоюєте досвід. +5% до отримуваного XP.',
-      skillType: SkillType.passive,
-      levelRequirement: 8,
-      statRequirements: {PlayerStat.intelligence: 15},
-      effects: {SkillEffectType.multiplyXpGain: 5.0},
-    ),
-    SkillModel(
-      id: 'passive_brute_force_1',
-      name: 'Груба Сила I',
-      description: 'Базова сила зростає. +2 до характеристики Сила.',
-      skillType: SkillType.passive,
-      levelRequirement: 10,
-      statRequirements: {PlayerStat.strength: 20},
-      skillPointCost: 2,
-      effects: {SkillEffectType.addStrength: 2.0},
-    ),
-    SkillModel(
-      id: 'active_buff_might_1',
-      name: 'Посилення I',
-      description:
-          'На короткий час ви наповнюєтесь силою. +5 до Сили на 10 хвилин.',
-      skillType: SkillType.activeBuff,
-      levelRequirement: 2,
-      statRequirements: {PlayerStat.strength: 2, PlayerStat.intelligence: 2},
-      skillPointCost: 1,
-      mpCost: 15.0,
-      duration: const Duration(minutes: 10),
-      cooldown: const Duration(hours: 1),
-      effects: {SkillEffectType.addStrength: 5.0},
-    ),
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  List<SkillModel> _allSkills = [];
+  bool _isLoading = true;
 
   List<SkillModel> get allSkills => _allSkills;
+  bool get isLoading => _isLoading;
+
+  SkillProvider() {
+    _loadAllSkillsFromFirestore();
+  }
+
+  Future<void> _loadAllSkillsFromFirestore() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final snapshot = await _firestore.collection('skills').get();
+      // Конвертуємо кожен документ в SkillModel
+      _allSkills = snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        // Потрібна конвертація для вкладених Map-ів
+        final statReqs = (data['statRequirements'] as Map<String, dynamic>?)
+            ?.map((key, value) =>
+                MapEntry(PlayerStat.values.byName(key), value as int));
+
+        final effects = (data['effects'] as Map<String, dynamic>?)?.map(
+            (key, value) =>
+                MapEntry(SkillEffectType.values.byName(key), value as double));
+
+        // Конвертація тривалості та перезарядки з секунд
+        final duration = data['durationSeconds'] != null
+            ? Duration(seconds: data['durationSeconds'])
+            : null;
+        final cooldown = data['cooldownSeconds'] != null
+            ? Duration(seconds: data['cooldownSeconds'])
+            : null;
+
+        return SkillModel(
+          id: data['id'] as String,
+          name: data['name'] as String,
+          description: data['description'] as String,
+          iconPath:
+              data['iconPath'] as String? ?? 'assets/icons/skills/default.svg',
+          skillType: SkillType.values.byName(data['skillType'] as String),
+          levelRequirement: data['levelRequirement'] as int? ?? 1,
+          skillPointCost: data['skillPointCost'] as int? ?? 1,
+          statRequirements: statReqs ?? {},
+          effects: effects ?? {},
+          mpCost: data['mpCost'] as double?,
+          duration: duration,
+          cooldown: cooldown,
+        );
+      }).toList();
+
+      print("Loaded ${_allSkills.length} skills from Firestore.");
+    } catch (e) {
+      print("Error loading skills from Firestore: $e");
+      _allSkills = []; // Якщо помилка, список буде порожнім
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
 
   SkillModel? getSkillById(String id) {
     return _allSkills.firstWhereOrNull((skill) => skill.id == id);
