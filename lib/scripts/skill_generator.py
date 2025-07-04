@@ -5,7 +5,7 @@ import google.cloud.firestore
 import google.generativeai as genai
 
 
-def generate_skills():
+def generate_skills() -> None:
     """
     Основна функція для генерації навичок та завантаження їх у Firestore.
     """
@@ -14,9 +14,10 @@ def generate_skills():
     # 1. Ініціалізація клієнтів
     # ------------------------------------
     try:
-        # Ініціалізація Firestore, використовуючи сервісний ключ.
-        # Бібліотека автоматично знайде ключ, якщо встановлено змінну оточення GOOGLE_APPLICATION_CREDENTIALS.
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service_account.json"
+        service_account_path = os.getenv(
+            "GOOGLE_APPLICATION_CREDENTIALS", "service_account.json"
+        )
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_path
         db = google.cloud.firestore.Client()
         print("Firestore Client Initialized.")
 
@@ -29,7 +30,7 @@ def generate_skills():
         model = genai.GenerativeModel("gemini-1.5-flash")
         print("Gemini API Initialized.")
 
-    except Exception as e:
+    except (ValueError, ImportError, google.cloud.exceptions.GoogleCloudError) as e:
         print(f"Error during initialization: {e}")
         return
 
