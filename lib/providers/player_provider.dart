@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:async';
 
 import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/providers/quest_provider.dart';
@@ -21,7 +22,7 @@ class PlayerProvider with ChangeNotifier {
   String? _uid;
 
   Map<PlayerStat, int>? _modifiedStats;
-  Map<String, DateTime> _skillCooldowns = {};
+  final Map<String, DateTime> _skillCooldowns = {};
   int? _modifiedMaxHp;
   int? _modifiedMaxMp;
 
@@ -128,7 +129,6 @@ class PlayerProvider with ChangeNotifier {
     _modifiedStats = Map.from(_player!.stats);
     double maxHpMultiplier = 1.0;
     double maxMpMultiplier = 1.0;
-    double xpGainMultiplier = 1.0;
 
     // 2. Застосовуємо ефекти від пасивних навичок
     for (String skillId in _player!.learnedSkillIds) {
@@ -150,9 +150,6 @@ class PlayerProvider with ChangeNotifier {
             case SkillEffectType.multiplyMaxMp:
               maxMpMultiplier *= (1 + value / 100.0);
               break;
-            case SkillEffectType.multiplyXpGain:
-              xpGainMultiplier *= (1 + value / 100.0);
-              break;
             default:
               break;
           }
@@ -162,13 +159,14 @@ class PlayerProvider with ChangeNotifier {
 
     // 3. Застосовуємо ефекти від активних бафів
     _player!.activeBuffs.removeWhere((skillId, endTimeString) {
-      return DateTime.parse(endTimeString).isBefore(DateTime.now());
+      bool isExpired = DateTime.parse(endTimeString).isBefore(DateTime.now());
+      if (isExpired) print("Buff for skill $skillId has expired.");
+      return isExpired;
     });
 
     for (String skillId in _player!.activeBuffs.keys) {
       final skill = _skillProvider!.getSkillById(skillId);
       if (skill != null && skill.skillType == SkillType.activeBuff) {
-        // Застосовуємо ефекти активного бафу
         skill.effects.forEach((effectType, value) {
           switch (effectType) {
             case SkillEffectType.addStrength:
@@ -184,9 +182,6 @@ class PlayerProvider with ChangeNotifier {
               break;
             case SkillEffectType.multiplyMaxMp:
               maxMpMultiplier *= (1 + value / 100.0);
-              break;
-            case SkillEffectType.multiplyXpGain:
-              xpGainMultiplier *= (1 + value / 100.0);
               break;
             default:
               break;
@@ -211,8 +206,6 @@ class PlayerProvider with ChangeNotifier {
 
     _player!.currentHp = min(_player!.currentHp, _modifiedMaxHp!);
     _player!.currentMp = min(_player!.currentMp, _modifiedMaxMp!);
-
-    // Не викликаємо notifyListeners() тут, це робиться в публічних методах
   }
 
   Future<void> _savePlayerData() async {
@@ -310,17 +303,14 @@ class PlayerProvider with ChangeNotifier {
     final skill = _skillProvider!.getSkillById(skillId);
     if (skill == null || skill.skillType != SkillType.activeBuff) return false;
 
-    // Перевірка, чи навичка вивчена
     if (!_player!.learnedSkillIds.contains(skillId)) return false;
 
-    // Перевірка, чи не активний вже цей баф
     if (_player!.activeBuffs.containsKey(skillId)) {
       slog.addMessage(
           "Ефект '${skill.name}' вже активний.", MessageType.warning);
       return false;
     }
 
-    // Перевірка перезарядки (cooldown)
     final cooldownEndTime = _skillCooldowns[skillId];
     if (cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now())) {
       slog.addMessage(
@@ -328,7 +318,6 @@ class PlayerProvider with ChangeNotifier {
       return false;
     }
 
-    // Перевірка вартості MP
     final mpCost = skill.mpCost?.toInt() ?? 0;
     if (_player!.currentMp < mpCost) {
       slog.addMessage(
@@ -336,15 +325,12 @@ class PlayerProvider with ChangeNotifier {
       return false;
     }
 
-    // Все добре, активуємо навичку
-    _player!.useMp(mpCost); // Витрачаємо MP
+    _player!.useMp(mpCost);
 
-    // Додаємо баф
     final buffEndTime =
         DateTime.now().add(skill.duration ?? const Duration(seconds: 0));
     _player!.activeBuffs[skillId] = buffEndTime.toIso8601String();
 
-    // Встановлюємо час перезарядки
     if (skill.cooldown != null) {
       _skillCooldowns[skillId] = DateTime.now().add(skill.cooldown!);
     }
