@@ -6,6 +6,7 @@ import '../providers/quest_provider.dart';
 import '../providers/player_provider.dart';
 import '../models/player_model.dart';
 import '../models/quest_model.dart';
+import '../widgets/active_buff_chip.dart';
 import 'system_log_screen.dart';
 
 class PlayerStatusScreen extends StatefulWidget {
@@ -311,7 +312,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             ),
             _buildInfoCard('Рівень:', '${player.level}'),
             const SizedBox(height: 16),
-            _buildActiveBuffsSection(player, skillProvider),
+            _buildActiveBuffsSection(player),
             const SizedBox(height: 16),
             _buildResourceBar("HP", player.currentHp, finalMaxHp,
                 Colors.redAccent[400]!, Icons.favorite_rounded),
@@ -407,34 +408,35 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     );
   }
 
-  Widget _buildActiveBuffsSection(
-      PlayerModel player, SkillProvider skillProvider) {
+  Widget _buildActiveBuffsSection(PlayerModel player) {
     if (player.activeBuffs.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    List<Widget> buffWidgets = [];
-    player.activeBuffs.forEach((skillId, endTimeString) {
-      final skill = skillProvider.getSkillById(skillId);
-      final endTime = DateTime.parse(endTimeString);
-      if (skill != null) {
-        buffWidgets.add(Chip(
-          avatar: const Icon(Icons.arrow_upward, color: Colors.greenAccent),
-          label: Text(
-            '${skill.name} (${endTime.difference(DateTime.now()).inMinutes}:${(endTime.difference(DateTime.now()).inSeconds % 60).toString().padLeft(2, '0')})',
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.white12,
-        ));
-      }
-    });
+    final List<Widget> buffWidgets = player.activeBuffs.entries.map((entry) {
+      return ActiveBuffChip(
+        key: ValueKey(entry.key),
+        skillId: entry.key,
+        endTimeString: entry.value,
+      );
+    }).toList();
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
-      child: Wrap(
-        spacing: 8.0,
-        runSpacing: 4.0,
-        children: buffWidgets,
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Активні Ефекти:',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8.0),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            children: buffWidgets,
+          ),
+        ],
       ),
     );
   }
