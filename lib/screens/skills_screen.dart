@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
@@ -85,45 +86,126 @@ class SkillsScreen extends StatelessWidget {
                 color: Colors.lightBlueAccent),
           ),
         ),
-        ...skills
-            .map((skill) => SkillCard(
-                skill: skill, playerProvider: playerProvider, slog: slog))
-            .toList(),
+        ...skills.map((skill) => SkillCard(skill: skill)).toList(),
       ],
     );
   }
 }
 
-class SkillCard extends StatelessWidget {
+class SkillCard extends StatefulWidget {
   final SkillModel skill;
-  final PlayerProvider playerProvider;
-  final SystemLogProvider slog;
 
   const SkillCard({
     super.key,
     required this.skill,
-    required this.playerProvider,
-    required this.slog,
   });
 
   @override
-  Widget build(BuildContext context) {
+  State<SkillCard> createState() => _SkillCardState();
+}
+
+class _SkillCardState extends State<SkillCard> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimerIfNeeded();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Це може бути кращим місцем для запуску таймера,
+    // оскільки провайдери вже точно доступні.
+    _startTimerIfNeeded();
+  }
+
+  void _startTimerIfNeeded() {
+    // Якщо таймер вже активний, нічого не робимо
+    if (_timer?.isActive ?? false) return;
+
+    final playerProvider = context.read<PlayerProvider>();
     final player = playerProvider.player;
-    final bool isLearned = player.learnedSkillIds.contains(skill.id);
-    final bool canLearn = !isLearned &&
-        context
-            .read<SkillProvider>()
-            .canLearnSkill(player, skill.id, player.availableSkillPoints);
-    final bool isLocked = !isLearned && !canLearn;
+    if (player == null) return;
+
+    final isBuffActive = player.activeBuffs.containsKey(widget.skill.id);
+    final cooldownEndTime =
+        playerProvider.getSkillCooldownEndTime(widget.skill.id);
+    final isOnCooldown =
+        cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now());
+
+    // Запускаємо таймер, тільки якщо є що відстежувати
+    if (isBuffActive || isOnCooldown) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        // Отримуємо найсвіжіші дані
+        final currentPlayer = context.read<PlayerProvider>().player;
+        final currentBuffEndTimeString =
+            currentPlayer.activeBuffs[widget.skill.id];
+        final currentCooldownEndTime = context
+            .read<PlayerProvider>()
+            .getSkillCooldownEndTime(widget.skill.id);
+
+        final bool buffIsStillActive = currentBuffEndTimeString != null &&
+            DateTime.parse(currentBuffEndTimeString).isAfter(DateTime.now());
+        final bool cooldownIsStillActive = currentCooldownEndTime != null &&
+            currentCooldownEndTime.isAfter(DateTime.now());
+
+        // Якщо нічого більше відстежувати, зупиняємо таймер
+        if (!buffIsStillActive && !cooldownIsStillActive) {
+          timer.cancel();
+          _timer = null;
+        }
+
+        // Викликаємо setState, щоб оновити UI
+        if (mounted) {
+          setState(() {});
+        } else {
+          // Якщо віджет вже не в дереві, скасовуємо таймер
+          timer.cancel();
+          _timer = null;
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Використовуємо watch, щоб реагувати на зміни в провайдері (наприклад, вивчення навички)
+    final playerProvider = context.watch<PlayerProvider>();
+    final slog = context.read<SystemLogProvider>();
+    final skillProvider = context.read<SkillProvider>();
+
+    final player = playerProvider.player;
+
+    final isLearned = player.learnedSkillIds.contains(widget.skill.id);
+    final canLearn = !isLearned &&
+        skillProvider.canLearnSkill(
+            player, widget.skill.id, player.availableSkillPoints);
+    final isLocked = !isLearned && !canLearn;
+
+    // Логіка для активних навичок
+    final cooldownEndTime =
+        playerProvider.getSkillCooldownEndTime(widget.skill.id);
+    final isOnCooldown =
+        cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now());
+
+    final buffEndTimeString = player.activeBuffs[widget.skill.id];
+    final isBuffActive = buffEndTimeString != null &&
+        DateTime.parse(buffEndTimeString).isAfter(DateTime.now());
+
+    // Перезапускаємо таймер, якщо потрібно (наприклад, після активації)
+    _startTimerIfNeeded();
 
     Color borderColor = isLearned
         ? Colors.amberAccent
         : (canLearn ? Colors.greenAccent : Colors.grey[700]!);
-
-    final cooldownEndTime = playerProvider.getSkillCooldownEndTime(skill.id);
-    final bool isOnCooldown =
-        cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now());
-    final bool isBuffActive = player.activeBuffs.containsKey(skill.id);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12.0),
@@ -140,57 +222,70 @@ class SkillCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.star, color: borderColor),
-                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(skill.name,
+                    child: Text(widget.skill.name,
                         style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                   if (isLearned &&
-                      skill.skillType == SkillType.activeBuff &&
+                      widget.skill.skillType == SkillType.activeBuff &&
                       !isBuffActive &&
                       !isOnCooldown)
                     ElevatedButton(
                       onPressed: () {
-                        playerProvider.activateSkill(skill.id, slog);
+                        playerProvider.activateSkill(widget.skill.id, slog);
                       },
                       style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue[700]),
-                      child: Text('Активувати (${skill.mpCost?.toInt()} MP)'),
+                      child: Text(
+                          'Активувати (${widget.skill.mpCost?.toInt()} MP)'),
                     ),
                   if (canLearn)
                     ElevatedButton(
                       onPressed: () {
-                        playerProvider.learnSkill(skill.id, slog);
+                        playerProvider.learnSkill(widget.skill.id, slog);
                       },
                       style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green[700]),
-                      child: Text('Вивчити (${skill.skillPointCost})'),
+                      child: Text('Вивчити (${widget.skill.skillPointCost})'),
                     ),
                   if (isLearned &&
-                      (skill.skillType == SkillType.passive || isBuffActive))
+                      (widget.skill.skillType == SkillType.passive ||
+                          isBuffActive))
                     const Icon(Icons.check_circle, color: Colors.amberAccent),
+                  if (isOnCooldown && !isBuffActive)
+                    const Icon(Icons.hourglass_bottom_rounded,
+                        color: Colors.redAccent),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(skill.description,
+              Text(widget.skill.description,
                   style: TextStyle(color: Colors.grey[300])),
-              if (isLearned &&
-                  skill.skillType == SkillType.activeBuff &&
-                  isOnCooldown)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'Перезарядка: ${cooldownEndTime.difference(DateTime.now()).inMinutes} хв. ${cooldownEndTime.difference(DateTime.now()).inSeconds % 60} сек.',
-                    style: TextStyle(color: Colors.redAccent[100]),
-                  ),
-                ),
               const SizedBox(height: 10),
-              if (isLocked) _buildRequirements(context, skill, player),
+              if (isBuffActive)
+                _buildTimerText('Активно:', DateTime.parse(buffEndTimeString),
+                    Colors.greenAccent[400]!),
+              if (isOnCooldown && !isBuffActive)
+                _buildTimerText(
+                    'Перезарядка:', cooldownEndTime, Colors.redAccent[100]!),
+              if (isLocked) _buildRequirements(context, widget.skill, player),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTimerText(String prefix, DateTime endTime, Color color) {
+    final remaining = endTime.difference(DateTime.now());
+    final durationToShow = remaining.isNegative ? Duration.zero : remaining;
+    final minutes = durationToShow.inMinutes.toString();
+    final seconds = (durationToShow.inSeconds % 60).toString().padLeft(2, '0');
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Text(
+        '$prefix $minutes:$seconds',
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -201,36 +296,28 @@ class SkillCard extends StatelessWidget {
     final bool levelMet = player.level >= skill.levelRequirement;
     if (skill.levelRequirement > 1) {
       reqWidgets.add(Text(
-        '• Рівень: ${skill.levelRequirement} (у вас ${player.level})',
-        style:
-            TextStyle(color: levelMet ? Colors.greenAccent : Colors.redAccent),
-      ));
+          '• Рівень: ${skill.levelRequirement} (у вас ${player.level})',
+          style: TextStyle(
+              color: levelMet ? Colors.greenAccent : Colors.redAccent)));
     }
-
     skill.statRequirements.forEach((stat, value) {
       final bool statMet = (player.stats[stat] ?? 0) >= value;
       reqWidgets.add(Text(
-        '• ${PlayerModel.getStatName(stat)}: $value (у вас ${player.stats[stat] ?? 0})',
-        style:
-            TextStyle(color: statMet ? Colors.greenAccent : Colors.redAccent),
-      ));
+          '• ${PlayerModel.getStatName(stat)}: $value (у вас ${player.stats[stat] ?? 0})',
+          style: TextStyle(
+              color: statMet ? Colors.greenAccent : Colors.redAccent)));
     });
-
     if (skill.skillPointCost > 0) {
       final bool spMet = player.availableSkillPoints >= skill.skillPointCost;
       reqWidgets.add(Text(
-        '• Очки навичок: ${skill.skillPointCost} (у вас ${player.availableSkillPoints})',
-        style: TextStyle(color: spMet ? Colors.greenAccent : Colors.redAccent),
-      ));
+          '• Очки навичок: ${skill.skillPointCost} (у вас ${player.availableSkillPoints})',
+          style:
+              TextStyle(color: spMet ? Colors.greenAccent : Colors.redAccent)));
     }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Вимоги:',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-        ...reqWidgets,
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Вимоги:',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+      ...reqWidgets
+    ]);
   }
 }
