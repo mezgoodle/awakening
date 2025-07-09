@@ -99,9 +99,7 @@ class MyApp extends StatelessWidget {
             foregroundColor: Colors.white,
           ),
           cardTheme: CardTheme(
-            // Стилізація карток
-            color: const Color(
-                0xFF1E1E1E), // Трохи темніший ніж 2A2A2A для різноманітності
+            color: const Color(0xFF1E1E1E),
             elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8.0),
