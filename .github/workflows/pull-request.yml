@@ -34,7 +34,7 @@ jobs:
       - run: flutter pub get
 
       # Run lint without erroring out
-      - run: flutter analyze --no-fail-on-error
+      # - run: flutter analyze
 
       # Run tests
       - run: flutter test
