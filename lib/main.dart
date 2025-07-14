@@ -10,6 +10,7 @@ import 'providers/skill_provider.dart';
 import 'screens/splash_screen.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'services/cloud_logger_service.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -26,32 +27,53 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
+        // --- 1. Базові Сервіси та Провайдери без Залежностей ---
+        Provider<CloudLoggerService>(
+          create: (_) => CloudLoggerService(),
+          lazy: false,
+        ),
+        // Надаємо сервіс автентифікації.
         Provider<FirebaseAuth>(
           create: (_) => FirebaseAuth.instance,
         ),
+        // SkillProvider поки що не залежить від інших, тому створюємо його тут.
         ChangeNotifierProvider(create: (_) => SkillProvider()),
+
+        // --- 2. Провайдери, що Залежать від Інших (Проксі-Провайдери) ---
+
+        // PlayerProvider залежить від FirebaseAuth та SkillProvider.
         ChangeNotifierProxyProvider2<FirebaseAuth, SkillProvider,
             PlayerProvider>(
-          create: (context) => PlayerProvider(null, null, null),
+          create: (context) =>
+              PlayerProvider(null, null, null), // Початкове створення
           update: (context, auth, skillProvider, previousPlayerProvider) {
-            if (previousPlayerProvider != null) {
-              previousPlayerProvider.update(auth, skillProvider, null);
-              return previousPlayerProvider;
-            }
-            return PlayerProvider(auth, skillProvider, null);
+            // Оновлюємо PlayerProvider, передаючи йому актуальні залежності.
+            previousPlayerProvider!.update(auth, skillProvider, null);
+            return previousPlayerProvider;
           },
         ),
+
+        // QuestProvider залежить від PlayerProvider.
         ChangeNotifierProxyProvider<PlayerProvider, QuestProvider>(
           create: (context) => QuestProvider(),
           update: (context, playerProvider, previousQuestProvider) {
-            if (previousQuestProvider != null) {
-              previousQuestProvider.update(playerProvider);
-              return previousQuestProvider;
-            }
-            return QuestProvider();
+            // Оновлюємо QuestProvider, передаючи йому PlayerProvider.
+            // Це запустить _loadQuests, як тільки гравець увійде.
+            previousQuestProvider!.update(playerProvider);
+            return previousQuestProvider;
           },
         ),
-        ChangeNotifierProvider(create: (_) => SystemLogProvider()),
+
+        // SystemLogProvider залежить від PlayerProvider та CloudLoggerService.
+        ChangeNotifierProxyProvider2<PlayerProvider, CloudLoggerService,
+            SystemLogProvider>(
+          create: (context) => SystemLogProvider(),
+          update: (context, playerProvider, logger, previousLogProvider) {
+            // Оновлюємо SystemLogProvider, передаючи йому обидві залежності.
+            previousLogProvider!.update(playerProvider, logger);
+            return previousLogProvider;
+          },
+        ),
       ],
       child: const MyApp(),
     ),
