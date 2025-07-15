@@ -7,6 +7,7 @@ import 'player_provider.dart';
 import 'system_log_provider.dart';
 import '../services/gemini_quest_service.dart';
 import '../models/system_message_model.dart';
+import '../services/cloud_logger_service.dart';
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
@@ -17,6 +18,8 @@ class QuestProvider with ChangeNotifier {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   PlayerProvider? _playerProvider;
+
+  final CloudLoggerService _logger = CloudLoggerService();
 
   // Ключ для збереження дати останньої генерації в документі гравця
   static const String _lastDailyQuestGenerationKey =
@@ -329,7 +332,10 @@ class QuestProvider with ChangeNotifier {
     if (newQuest != null) {
       await addQuest(newQuest, slog); // Тепер викликаємо асинхронний метод
     } else {
-      print("Failed to generate a new quest using Gemini API.");
+      _logger.writeLog(
+        message: "Failed to generate a new quest using Gemini API.",
+        severity: MessageType.error.name,
+      );
       slog.addMessage("Не вдалося згенерувати завдання.", MessageType.error);
     }
 

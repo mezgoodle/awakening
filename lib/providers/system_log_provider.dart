@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'dart:convert';
 import 'package:awakening/providers/player_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,7 +10,6 @@ class SystemLogProvider with ChangeNotifier {
   SystemMessageModel? _latestMessageForSnackbar;
 
   static const String _logKey = 'systemLogData';
-  static const int _maxLogSize = 100;
 
   PlayerProvider? _playerProvider;
   CloudLoggerService? _cloudLogger;
@@ -43,36 +41,6 @@ class SystemLogProvider with ChangeNotifier {
       _latestMessageForSnackbar = newMessage;
     }
     notifyListeners();
-
-    // Відправляємо лог в GCP через наш сервіс
-    if (_cloudLogger != null) {
-      String severity;
-      switch (type) {
-        case MessageType.error:
-          severity = 'ERROR';
-          break;
-        case MessageType.warning:
-          severity = 'WARNING';
-          break;
-        default:
-          severity = 'INFO';
-      }
-
-      Map<String, dynamic> finalPayload = {
-        'message': text,
-        'userId': _playerProvider?.getUserId() ?? 'unknown',
-        'logType': type.name,
-      };
-      if (payload != null) {
-        finalPayload.addAll(payload);
-      }
-
-      _cloudLogger!.writeLog(
-        message: text,
-        severity: severity,
-        payload: finalPayload,
-      );
-    }
   }
 
   Future<void> clearLog() async {
