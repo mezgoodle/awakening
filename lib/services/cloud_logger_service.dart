@@ -1,85 +1,83 @@
-// lib/services/cloud_logger_service.dart
-
 import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:googleapis/logging/v2.dart';
+import 'package:googleapis_auth/auth_io.dart';
 
 class CloudLoggerService {
-  final String? _apiKey;
-  final String? _projectId;
+  late LoggingApi _loggingApi;
   bool _isInitialized = false;
+  late final String _projectId;
 
+  // Використовуємо синглтон
   static final CloudLoggerService _instance = CloudLoggerService._internal();
   factory CloudLoggerService() => _instance;
 
-  CloudLoggerService._internal()
-      : _apiKey = dotenv.env['GCP_LOGGING_API_KEY'],
-        _projectId = "gen-lang-client-0957500330" {
+  // Конструктор тепер знову викликає асинхронний метод ініціалізації
+  CloudLoggerService._internal() {
     _initialize();
   }
 
-  void _initialize() {
-    if (_apiKey == null || _apiKey!.isEmpty) {
+  Future<void> _initialize() async {
+    try {
+      // 1. Завантажуємо service_account.json з асетів
+      final jsonString =
+          await rootBundle.loadString('assets/service_account.json');
+      final credentialsJson = jsonDecode(jsonString);
+
+      _projectId = credentialsJson['project_id'];
+
+      // 2. Створюємо облікові дані (credentials)
+      final credentials = ServiceAccountCredentials.fromJson(credentialsJson);
+
+      // 3. Створюємо автентифікований HTTP клієнт
+      final scopes = [LoggingApi.loggingWriteScope];
+      final client = await clientViaServiceAccount(credentials, scopes);
+
+      // 4. Ініціалізуємо API для логування
+      _loggingApi = LoggingApi(client);
+      _isInitialized = true;
       print(
-          "!!! CloudLoggerService: GCP_LOGGING_API_KEY not found in .env file.");
+          "CloudLoggerService Initialized Successfully (via Service Account). Project ID: $_projectId");
+    } catch (e) {
+      print("!!! FATAL ERROR INITIALIZING CloudLoggerService: $e");
+      print(
+          "!!! Logging to GCP will not work. Check 'assets/service_account.json'.");
       _isInitialized = false;
-      return;
     }
-    if (_projectId == null || _projectId!.isEmpty) {
-      print("!!! CloudLoggerService: GCP_PROJECT_ID not found in .env file.");
-      _isInitialized = false;
-      return;
-    }
-    _isInitialized = true;
-    print("CloudLoggerService Initialized. Project ID: $_projectId");
   }
 
   Future<void> writeLog({
     required String message,
-    String severity = 'INFO', // INFO, WARNING, ERROR, DEBUG
+    String severity = 'INFO', // INFO, WARNING, ERROR, DEBUG, etc.
     String logName = 'flutter-app-log', // Назва лог-стріму
     Map<String, dynamic>? payload,
   }) async {
     if (!_isInitialized) {
-      print("CloudLoggerService not initialized. Skipping log.");
-      return;
+      // Дамо сервісу ще один шанс на ініціалізацію, якщо перший запуск був занадто швидким
+      if (!_isInitialized) await _initialize();
+      if (!_isInitialized) {
+        print("CloudLoggerService not initialized. Skipping log.");
+        return;
+      }
     }
-
-    // Формуємо URL для Cloud Logging API
-    final url = Uri.parse(
-        'https://logging.googleapis.com/v2/entries:write?key=$_apiKey');
 
     final fullLogName = 'projects/$_projectId/logs/$logName';
 
-    final logEntry = {
-      "logName": fullLogName,
-      "resource": {"type": "global"}, // Найпростіший тип ресурсу
-      "severity": severity,
-      "jsonPayload": {
-        "message": message,
-        if (payload != null) ...payload,
-      },
-    };
+    final entry = LogEntry(
+      logName: fullLogName,
+      severity: severity,
+      resource: MonitoredResource(type: 'global'),
+      jsonPayload: payload,
+      textPayload: payload == null ? message : null,
+    );
 
-    final body = {
-      "entries": [logEntry]
-    };
+    final request = WriteLogEntriesRequest(entries: [entry]);
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        print("Log sent to GCP successfully: $message");
-      } else {
-        print("Error sending log to GCP. Status code: ${response.statusCode}");
-        print("Response body: ${response.body}");
-      }
+      await _loggingApi.entries.write(request);
+      print("Log sent to GCP: $message");
     } catch (e) {
-      print("Exception while sending log to GCP: $e");
+      print("Error sending log to GCP: $e");
     }
   }
 }
