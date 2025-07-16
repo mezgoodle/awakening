@@ -334,7 +334,7 @@ class QuestProvider with ChangeNotifier {
     } else {
       _logger.writeLog(
         message: "Failed to generate a new quest using Gemini API.",
-        severity: MessageType.error.name,
+        severity: MessageSeverity.error,
       );
       slog.addMessage("Не вдалося згенерувати завдання.", MessageType.error);
     }

@@ -36,10 +36,8 @@ jobs:
       - name: Create .env file
         run: |
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
-          echo "GCP_LOGGING_API_KEY=${{ secrets.GCP_LOGGING_API_KEY }}" >> .env
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GCP_LOGGING_API_KEY: ${{ secrets.GCP_LOGGING_API_KEY }}
 
       # Get flutter dependencies.
       - run: flutter pub get

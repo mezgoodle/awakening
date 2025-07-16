@@ -3,6 +3,13 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:googleapis/logging/v2.dart';
 import 'package:googleapis_auth/auth_io.dart';
 
+enum MessageSeverity {
+  info,
+  warning,
+  error,
+  debug,
+}
+
 class CloudLoggerService {
   late LoggingApi _loggingApi;
   bool _isInitialized = false;
@@ -46,9 +53,24 @@ class CloudLoggerService {
     }
   }
 
+  String _severityToString(MessageSeverity severity) {
+    switch (severity) {
+      case MessageSeverity.info:
+        return 'INFO';
+      case MessageSeverity.warning:
+        return 'WARNING';
+      case MessageSeverity.error:
+        return 'ERROR';
+      case MessageSeverity.debug:
+        return 'DEBUG';
+      default:
+        return 'UNKNOWN';
+    }
+  }
+
   Future<void> writeLog({
     required String message,
-    String severity = 'INFO', // INFO, WARNING, ERROR, DEBUG, etc.
+    MessageSeverity severity = MessageSeverity.info,
     String logName = 'flutter-app-log', // Назва лог-стріму
     Map<String, dynamic>? payload,
   }) async {
@@ -65,7 +87,7 @@ class CloudLoggerService {
 
     final entry = LogEntry(
       logName: fullLogName,
-      severity: severity,
+      severity: _severityToString(severity),
       resource: MonitoredResource(type: 'global'),
       jsonPayload: payload,
       textPayload: payload == null ? message : null,

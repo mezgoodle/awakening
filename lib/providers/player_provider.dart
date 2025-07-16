@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/providers/quest_provider.dart';
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/player_model.dart';
@@ -20,6 +21,8 @@ class PlayerProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth? _auth;
   String? _uid;
+
+  final _logger = CloudLoggerService();
 
   Map<PlayerStat, int>? _modifiedStats;
   final Map<String, DateTime> _skillCooldowns = {};
@@ -100,16 +103,20 @@ class PlayerProvider with ChangeNotifier {
       if (playerSnapshot.exists && playerSnapshot.data() != null) {
         _player = PlayerModel.fromJson(
             playerSnapshot.data()! as Map<String, dynamic>);
-        print("Player data for UID $_uid loaded from Firestore.");
+        _logger.writeLog(
+            message: "Player data for UID $_uid loaded from Firestore.");
       } else {
         _player = PlayerModel();
-        print(
-            "No player data in Firestore for UID $_uid, creating new player.");
+        _logger.writeLog(
+            message:
+                "No player data in Firestore for UID $_uid, creating new player.");
         await _savePlayerData();
       }
     } catch (e) {
-      print(
-          "Error loading player data from Firestore: $e. Creating new player.");
+      _logger.writeLog(
+          message:
+              "Error loading player data from Firestore: $e. Creating new player.",
+          severity: MessageSeverity.warning);
       _player = PlayerModel();
       await _savePlayerData();
     }
