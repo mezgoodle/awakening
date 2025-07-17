@@ -104,7 +104,17 @@ class PlayerProvider with ChangeNotifier {
         _player = PlayerModel.fromJson(
             playerSnapshot.data()! as Map<String, dynamic>);
         _logger.writeLog(
-            message: "Player data for UID $_uid loaded from Firestore.");
+            message: "Player data for UID $_uid loaded from Firestore.",
+            payload: {
+              "message": "Player data loaded",
+              "context": {
+                "user": {
+                  "playerName": _player!.playerName,
+                  "level": _player!.level,
+                  "xp": _player!.xp,
+                }
+              }
+            });
       } else {
         _player = PlayerModel();
         _logger.writeLog(
