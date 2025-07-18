@@ -119,7 +119,18 @@ class PlayerProvider with ChangeNotifier {
         _player = PlayerModel();
         _logger.writeLog(
             message:
-                "No player data in Firestore for UID $_uid, creating new player.");
+                "No player data in Firestore for UID $_uid, creating new player.",
+            payload: {
+              "message": "No player data found",
+              "context": {
+                "id": _uid,
+                "user": {
+                  "playerName": _player!.playerName,
+                  "level": _player!.level,
+                  "xp": _player!.xp,
+                }
+              }
+            });
         await _savePlayerData();
       }
     } catch (e) {
@@ -142,12 +153,10 @@ class PlayerProvider with ChangeNotifier {
   void _calculateFinalStats() {
     if (_player == null || _skillProvider == null) return;
 
-    // 1. Скидаємо модифікатори до базових значень
     _modifiedStats = Map.from(_player!.stats);
     double maxHpMultiplier = 1.0;
     double maxMpMultiplier = 1.0;
 
-    // 2. Застосовуємо ефекти від пасивних навичок
     for (String skillId in _player!.learnedSkillIds) {
       final skill = _skillProvider!.getSkillById(skillId);
       if (skill != null && skill.skillType == SkillType.passive) {
@@ -174,7 +183,6 @@ class PlayerProvider with ChangeNotifier {
       }
     }
 
-    // 3. Застосовуємо ефекти від активних бафів
     _player!.activeBuffs.removeWhere((skillId, endTimeString) {
       bool isExpired = DateTime.parse(endTimeString).isBefore(DateTime.now());
       if (isExpired) print("Buff for skill $skillId has expired.");
@@ -207,7 +215,6 @@ class PlayerProvider with ChangeNotifier {
       }
     }
 
-    // 4. Перераховуємо HP/MP на основі фінальних модифікованих статів
     int stamina = _modifiedStats![PlayerStat.stamina] ?? 0;
     int intelligence = _modifiedStats![PlayerStat.intelligence] ?? 0;
     _modifiedMaxHp = (((_player!.level * PlayerModel.baseHpPerLevel) +
@@ -278,8 +285,6 @@ class PlayerProvider with ChangeNotifier {
         slog?.addMessage("Отримано $pointsGained оч. характеристик!",
             MessageType.statsIncreased);
       }
-      // Логіка зміни рангу тепер в awardNewRank або requestRankUpChallenge
-      // _checkForAvailableRankUpChallenge();
     }
   }
 
