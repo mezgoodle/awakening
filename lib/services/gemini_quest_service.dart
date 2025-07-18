@@ -9,9 +9,11 @@ class GeminiQuestService {
   final GenerativeModel _model;
   final CloudLoggerService _logger = CloudLoggerService();
 
+  static const String modelName = 'gemini-2.0-flash-001';
+
   GeminiQuestService()
       : _model = GenerativeModel(
-            model: 'gemini-2.0-flash-001',
+            model: modelName,
             apiKey: dotenv.env['GEMINI_API_KEY']!,
             safetySettings: [
               SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
@@ -176,7 +178,7 @@ $hpCostInstruction
             message: "Gemini API returned empty response",
             payload: {
               "prompt": prompt,
-              "model": _model.toString(),
+              "model": modelName,
             },
             severity: MessageSeverity.error);
         return null;
@@ -196,7 +198,7 @@ $hpCostInstruction
             payload: {
               "response": response.text,
               "prompt": prompt,
-              "model": _model.toString(),
+              "model": modelName,
             },
             severity: MessageSeverity.error);
         return null;
@@ -219,7 +221,7 @@ $hpCostInstruction
               "xpReward": jsonResponse['xpReward'],
             },
             "prompt": prompt,
-            "model": _model.toString(),
+            "model": modelName,
           },
           severity: MessageSeverity.error,
         );
@@ -239,7 +241,7 @@ $hpCostInstruction
               "difficulty": jsonResponse['difficulty'],
               "prompt": prompt,
               "playerRank": player.playerRank.name,
-              "model": _model.toString(),
+              "model": modelName,
             },
             severity: MessageSeverity.error,
           );
@@ -252,7 +254,7 @@ $hpCostInstruction
           payload: {
             "prompt": prompt,
             "playerRank": player.playerRank.name,
-            "model": _model.toString(),
+            "model": modelName,
           },
           severity: MessageSeverity.warning,
         );
@@ -275,7 +277,7 @@ $hpCostInstruction
                   "statName": key,
                   "value": value,
                   "prompt": prompt,
-                  "model": _model.toString(),
+                  "model": modelName,
                 },
                 severity: MessageSeverity.warning,
               );
@@ -301,7 +303,7 @@ $hpCostInstruction
             payload: {
               "targetStat": jsonResponse['targetStat'],
               "prompt": prompt,
-              "model": _model.toString(),
+              "model": modelName,
             },
             severity: MessageSeverity.warning,
           );
@@ -315,7 +317,7 @@ $hpCostInstruction
         if (hpCost == 0) hpCost = null;
       }
 
-      return QuestModel(
+      final quest = QuestModel(
         title: jsonResponse['title'],
         description: jsonResponse['description'],
         xpReward: (jsonResponse['xpReward'] as num).toInt(),
@@ -324,13 +326,25 @@ $hpCostInstruction
         targetStat: parsedTargetStat ?? targetStat,
         hpCostOnCompletion: hpCost,
       );
+      _logger.writeLog(
+        message: "Quest generated successfully",
+        payload: {
+          "message": "Quest generated successfully",
+          "quest": quest.toJson(),
+          "prompt": prompt,
+          "model": modelName,
+        },
+        severity: MessageSeverity.info,
+      );
+
+      return quest;
     } catch (e) {
       _logger.writeLog(
         message: "Error generating quest with Gemini API: $e",
         severity: MessageSeverity.error,
         payload: {
           "prompt": prompt,
-          "model": _model.toString(),
+          "model": modelName,
         },
       );
       if (e is GenerativeAIException) {
@@ -339,7 +353,7 @@ $hpCostInstruction
           severity: MessageSeverity.error,
           payload: {
             "prompt": prompt,
-            "model": _model.toString(),
+            "model": modelName,
           },
         );
       }
