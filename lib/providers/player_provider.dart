@@ -258,7 +258,6 @@ class PlayerProvider with ChangeNotifier {
   void _checkLevelUp(SystemLogProvider? slog) {
     if (_player == null) return;
     bool leveledUpThisCheck = false;
-    QuestDifficulty oldRank = _player!.playerRank; // Зберігаємо старий ранг
     int oldAvailablePoints = _player!.availableStatPoints;
 
     while (_player!.xp >= _player!.xpToNextLevel) {
@@ -466,9 +465,26 @@ class PlayerProvider with ChangeNotifier {
     if (_playerDocRef != null) {
       try {
         await _playerDocRef!.delete();
-        print("Player document for UID $_uid deleted from Firestore.");
+        _logger.writeLog(
+          message: "Player document for UID $_uid deleted from Firestore.",
+          payload: {
+            "message": "Player data reset",
+            "context": {"id": _uid}
+          },
+        );
       } catch (e) {
-        print("Error deleting player document: $e");
+        _logger.writeLog(
+          message: "Error deleting player document: $e",
+          severity: MessageSeverity.error,
+          payload: {
+            "message": "Error deleting player document",
+            "context": {
+              "id": _uid,
+              "error": e.toString(),
+              "platform": defaultTargetPlatform.toString()
+            },
+          },
+        );
       }
     }
     _player = PlayerModel();
@@ -476,7 +492,13 @@ class PlayerProvider with ChangeNotifier {
     _justLeveledUp = false;
     await _savePlayerData();
     notifyListeners();
-    print("Player data has been reset in Firestore.");
+    _logger.writeLog(
+      message: "Player data has been reset in Firestore.",
+      payload: {
+        "message": "Player data reset",
+        "context": {"id": _uid}
+      },
+    );
   }
 
   void awardNewRank(QuestDifficulty newRank, SystemLogProvider slog) {
@@ -486,7 +508,6 @@ class PlayerProvider with ChangeNotifier {
       slog.addMessage(
           "Ранг Мисливця підвищено! Новий ранг: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
           MessageType.rankUp);
-      print("RANK UP! Awarded new rank: ${_player!.playerRank.name}");
       _savePlayerData(); // Зберігаємо зміни
       notifyListeners();
       // _checkForAvailableRankUpChallenge(); // Перевіряємо, чи доступний наступний ранг-ап
@@ -509,8 +530,6 @@ class PlayerProvider with ChangeNotifier {
           QuestDifficulty.values[currentRank.index + 1];
 
       if (targetRankForChallenge.index > nextPotentialRankByLevel.index) {
-        print(
-            "Cannot request rank up challenge yet. Level ${player.level} too low for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)} rank challenge (needs level for ${QuestModel.getQuestDifficultyName(nextPotentialRankByLevel)}).");
         slog.addMessage(
             "Рівень ${player.level} недостатній для випробування на ранг ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}.",
             MessageType.info);

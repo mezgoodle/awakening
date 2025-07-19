@@ -60,7 +60,10 @@ class QuestProvider with ChangeNotifier {
 
   Future<void> _loadQuests() async {
     if (_questsCollectionRef == null) {
-      print("QuestProvider: Cannot load quests, no user ID.");
+      _logger.writeLog(
+        message: "Cannot load quests, no user ID.",
+        severity: MessageSeverity.error,
+      );
       _isLoading = false;
       notifyListeners();
       return;
@@ -77,7 +80,13 @@ class QuestProvider with ChangeNotifier {
           .map(
               (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
           .toList();
-      print("Loaded ${_activeQuests.length} active quests from Firestore.");
+      _logger.writeLog(
+        message: "Loaded ${_activeQuests.length} active quests from Firestore.",
+        payload: {
+          "message": "Active quests loaded",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
 
       final completedSnapshot = await _questsCollectionRef!
           .where('isCompleted', isEqualTo: true)
@@ -88,10 +97,22 @@ class QuestProvider with ChangeNotifier {
           .map(
               (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
           .toList();
-      print(
-          "Loaded ${_completedQuests.length} completed quests from Firestore.");
+      _logger.writeLog(
+          message:
+              "Loaded ${_completedQuests.length} completed quests from Firestore.",
+          payload: {
+            "message": "Completed quests loaded",
+            "context": {"userId": _playerProvider?.getUserId()}
+          });
     } catch (e) {
-      print("Error loading quests from Firestore: $e");
+      _logger.writeLog(
+        message: "Error loading quests from Firestore: $e",
+        severity: MessageSeverity.error,
+        payload: {
+          "message": "Quest loading error",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
       _activeQuests = [];
       _completedQuests = [];
     }
@@ -111,9 +132,31 @@ class QuestProvider with ChangeNotifier {
 
     try {
       await _questsCollectionRef!.doc(quest.id).set(quest.toJson());
-      print("Quest '${quest.title}' added to Firestore.");
+      _logger.writeLog(
+        message: "Quest '${quest.title}' added to Firestore.",
+        payload: {
+          "message": "Quest added",
+          "context": {
+            "questId": quest.id,
+            "questTitle": quest.title,
+            "userId": _playerProvider?.getUserId()
+          }
+        },
+      );
     } catch (e) {
-      print("Error adding quest to Firestore: $e");
+      _logger.writeLog(
+        message: "Error adding quest '${quest.title}' to Firestore: $e",
+        severity: MessageSeverity.error,
+        payload: {
+          "message": "Quest addition error",
+          "context": {
+            "questId": quest.id,
+            "questTitle": quest.title,
+            "userId": _playerProvider?.getUserId(),
+            "error": e.toString()
+          }
+        },
+      );
       slog.addMessage(
           "Помилка збереження завдання '${quest.title}'", MessageType.error);
       _activeQuests.removeWhere((q) => q.id == quest.id);
@@ -169,9 +212,31 @@ class QuestProvider with ChangeNotifier {
           'isCompleted': true,
           'completedAt': quest.completedAt?.toIso8601String(),
         });
-        print("Quest '$questId' marked as completed in Firestore.");
+        _logger.writeLog(
+          message: "Quest '$questId' marked as completed in Firestore.",
+          payload: {
+            "message": "Quest completed",
+            "context": {
+              "questId": quest.id,
+              "questTitle": quest.title,
+              "userId": _playerProvider?.getUserId()
+            }
+          },
+        );
       } catch (e) {
-        print("Error updating quest in Firestore: $e");
+        _logger.writeLog(
+          message: "Error updating quest '$questId' in Firestore: $e",
+          severity: MessageSeverity.error,
+          payload: {
+            "message": "Quest update error",
+            "context": {
+              "questId": quest.id,
+              "questTitle": quest.title,
+              "userId": _playerProvider?.getUserId(),
+              "error": e.toString()
+            }
+          },
+        );
         slog.addMessage("Помилка оновлення статусу завдання '${quest.title}'",
             MessageType.error);
         _completedQuests.removeWhere((q) => q.id == questId);
@@ -198,7 +263,14 @@ class QuestProvider with ChangeNotifier {
         lastGenerationDateStr = data[_lastDailyQuestGenerationKey];
       }
     } catch (e) {
-      print("Could not read last daily quest generation date: $e");
+      _logger.writeLog(
+        message: "Could not read last daily quest generation date: $e",
+        severity: MessageSeverity.error,
+        payload: {
+          "message": "Daily quest generation date read error",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
     }
 
     final today = DateTime.now();
@@ -255,8 +327,18 @@ class QuestProvider with ChangeNotifier {
             // Перевірка, чи Gemini згенерував квест для правильного стату. Якщо ні - використовуємо fallback.
             if (generatedQuest.targetStat == null ||
                 generatedQuest.targetStat != stat) {
-              print(
-                  "Gemini daily quest had incorrect targetStat. Using fallback for ${stat.name}.");
+              _logger.writeLog(
+                  message:
+                      "Gemini generated daily quest for ${stat.name}, but targetStat is incorrect. Using fallback.",
+                  severity: MessageSeverity.warning,
+                  payload: {
+                    "message": "Gemini quest targetStat mismatch",
+                    "context": {
+                      "stat": stat.name,
+                      "questId": generatedQuest.id,
+                      "userId": _playerProvider?.getUserId()
+                    }
+                  });
               questToAdd = _getFallbackDailyQuestForStat(stat, currentPlayer);
             } else {
               questToAdd = generatedQuest;
@@ -295,10 +377,8 @@ class QuestProvider with ChangeNotifier {
 
   QuestModel _getFallbackDailyQuestForStat(
       PlayerStat stat, PlayerModel player) {
-    // ... (Цей метод залишається без змін, оскільки він не взаємодіє з базою даних)
     int xpBase = 15 + (player.level * 2);
     switch (stat) {
-      // ... (всі case-и)
       default:
         return QuestModel(
             title: "Default Daily",

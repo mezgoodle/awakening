@@ -131,7 +131,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             const SizedBox(width: 8),
             Text(
               '$label: $currentValue / $maxValue',
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 15,
                   color: Colors.white70,
                   fontWeight: FontWeight.w600),
@@ -266,8 +266,8 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               player.playerName,
               actionWidget: IconButton(
                 // Додаємо кнопку редагування
-                icon:
-                    Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
+                icon: const Icon(Icons.edit_outlined,
+                    color: Colors.white70, size: 20),
                 tooltip: 'Редагувати ім\'я',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
