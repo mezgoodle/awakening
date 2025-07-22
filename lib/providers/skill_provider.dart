@@ -1,11 +1,14 @@
-import 'package:collection/collection.dart';
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/skill_model.dart';
 import '../models/player_model.dart';
+import 'package:collection/collection.dart';
 
 class SkillProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  final CloudLoggerService _logger = CloudLoggerService();
 
   List<SkillModel> _allSkills = [];
   bool _isLoading = true;
@@ -23,11 +26,9 @@ class SkillProvider with ChangeNotifier {
 
     try {
       final snapshot = await _firestore.collection('skills').get();
-      // Конвертуємо кожен документ в SkillModel
       _allSkills = snapshot.docs.map((doc) {
         final data = doc.data();
 
-        // Потрібна конвертація для вкладених Map-ів
         final statReqs = (data['statRequirements'] as Map<String, dynamic>?)
             ?.map((key, value) =>
                 MapEntry(PlayerStat.values.byName(key), value as int));
@@ -36,7 +37,6 @@ class SkillProvider with ChangeNotifier {
             (key, value) =>
                 MapEntry(SkillEffectType.values.byName(key), value as double));
 
-        // Конвертація тривалості та перезарядки з секунд
         final duration = data['durationSeconds'] != null
             ? Duration(seconds: data['durationSeconds'])
             : null;
@@ -60,11 +60,19 @@ class SkillProvider with ChangeNotifier {
           cooldown: cooldown,
         );
       }).toList();
-
-      print("Loaded ${_allSkills.length} skills from Firestore.");
+      _logger.writeLog(
+        message: "Loaded ${_allSkills.length} skills from Firestore.",
+        severity: MessageSeverity.info,
+      );
     } catch (e) {
-      print("Error loading skills from Firestore: $e");
-      _allSkills = []; // Якщо помилка, список буде порожнім
+      _logger.writeLog(
+        message: "Error loading skills from Firestore",
+        severity: MessageSeverity.error,
+        payload: {
+          'error': e.toString(),
+        },
+      );
+      _allSkills = [];
     }
 
     _isLoading = false;
