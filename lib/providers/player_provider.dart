@@ -22,7 +22,7 @@ class PlayerProvider with ChangeNotifier {
   final FirebaseAuth? _auth;
   String? _uid;
 
-  final _logger = CloudLoggerService();
+  final CloudLoggerService _logger = CloudLoggerService();
 
   Map<PlayerStat, int>? _modifiedStats;
   final Map<String, DateTime> _skillCooldowns = {};
@@ -185,8 +185,9 @@ class PlayerProvider with ChangeNotifier {
 
     _player!.activeBuffs.removeWhere((skillId, endTimeString) {
       bool isExpired = DateTime.parse(endTimeString).isBefore(DateTime.now());
-      if (isExpired) print("Buff for skill $skillId has expired.");
-      return isExpired;
+      if (isExpired) {
+        return isExpired;
+      }
     });
 
     for (String skillId in _player!.activeBuffs.keys) {
@@ -234,14 +235,42 @@ class PlayerProvider with ChangeNotifier {
 
   Future<void> _savePlayerData() async {
     if (_playerDocRef == null || _player == null) {
-      print("Player data not ready for saving yet (no UID or player model).");
+      _logger.writeLog(
+        message:
+            "Player data not ready for saving yet (no UID or player model).",
+        severity: MessageSeverity.warning,
+      );
       return;
     }
     try {
       await _playerDocRef!.set(_player!.toJson());
-      print("Player data for UID $_uid saved to Firestore.");
+      _logger.writeLog(
+        message: "Player data for UID $_uid saved to Firestore.",
+        payload: {
+          "message": "Player data saved",
+          "context": {
+            "id": _uid,
+            "user": {
+              "playerName": _player!.playerName,
+              "level": _player!.level,
+              "xp": _player!.xp,
+            }
+          }
+        },
+      );
     } catch (e) {
-      print("Error saving player data to Firestore: $e");
+      _logger.writeLog(
+        message: "Error saving player data to Firestore: $e",
+        severity: MessageSeverity.error,
+        payload: {
+          "message": "Error saving player data",
+          "context": {
+            "id": _uid,
+            "error": e.toString(),
+            "platform": defaultTargetPlatform.toString()
+          },
+        },
+      );
     }
   }
 
@@ -401,9 +430,9 @@ class PlayerProvider with ChangeNotifier {
 
   void applyInitialStatBonuses(Map<PlayerStat, int> bonuses) {
     if (_isLoading || _player!.initialSurveyCompleted) {
-      if (_player!.initialSurveyCompleted)
-        print("Initial stat bonuses already applied.");
-      return;
+      if (_player!.initialSurveyCompleted) {
+        return;
+      }
     }
 
     bool statsAffectingHpMpChanged = false;
@@ -413,8 +442,6 @@ class PlayerProvider with ChangeNotifier {
         if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
           statsAffectingHpMpChanged = true;
         }
-        print(
-            "Applied +$bonusAmount bonus to ${PlayerModel.getStatName(stat)} from survey.");
       }
     });
 

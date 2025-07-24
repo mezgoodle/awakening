@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'quest_model.dart';
 
 enum PlayerStat {
@@ -185,6 +186,7 @@ class PlayerModel {
         ),
       );
     } else {
+      // ignore: avoid_print
       print(
           "Warning: 'stats' field is missing or not a map in JSON. Using default stats.");
       loadedStats = {
@@ -205,6 +207,7 @@ class PlayerModel {
         loadedBaselinePerformance = decodedMap.map((key, value) =>
             MapEntry(PhysicalActivity.values.byName(key), value));
       } catch (e) {
+        // ignore: avoid_print
         print("Error decoding baselinePhysicalPerformance from JSON: $e");
       }
     }

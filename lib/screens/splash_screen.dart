@@ -1,5 +1,6 @@
 // lib/screens/splash_screen.dart
 
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Імпорт Firebase Auth
@@ -16,6 +17,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final CloudLoggerService _logger = CloudLoggerService();
+
   @override
   void initState() {
     super.initState();
@@ -35,9 +38,23 @@ class _SplashScreenState extends State<SplashScreen> {
         // Якщо користувач не увійшов, виконуємо анонімний вхід
         final userCredential = await FirebaseAuth.instance.signInAnonymously();
         user = userCredential.user;
-        print("Signed in anonymously with UID: ${user?.uid}");
+        _logger.writeLog(
+          message: "Signed in anonymously with UID: ${user?.uid}",
+          severity: MessageSeverity.info,
+          payload: {
+            "message": "User signed in anonymously",
+            "context": {"id": user?.uid},
+          },
+        );
       } else {
-        print("User already signed in with UID: ${user.uid}");
+        _logger.writeLog(
+          message: "User already signed in with UID: ${user.uid}",
+          severity: MessageSeverity.info,
+          payload: {
+            "message": "User already signed in",
+            "context": {"id": user.uid},
+          },
+        );
       }
 
       if (user != null) {
@@ -63,7 +80,14 @@ class _SplashScreenState extends State<SplashScreen> {
         _showErrorAndStay();
       }
     } catch (e) {
-      print("Error during anonymous sign-in: $e");
+      _logger.writeLog(
+        message: "Error during anonymous sign-in: $e",
+        severity: MessageSeverity.error,
+        payload: {
+          "message": "Error during anonymous sign-in",
+          "context": {"error": e.toString()},
+        },
+      );
       _showErrorAndStay();
     }
   }
