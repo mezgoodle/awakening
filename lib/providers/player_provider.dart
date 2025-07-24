@@ -188,6 +188,7 @@ class PlayerProvider with ChangeNotifier {
       if (isExpired) {
         return isExpired;
       }
+      return false;
     });
 
     for (String skillId in _player!.activeBuffs.keys) {
