@@ -137,7 +137,7 @@ class PlayerProvider with ChangeNotifier {
       _logger.writeLog(
           message:
               "Error loading player data from Firestore: $e. Creating new player.",
-          severity: MessageSeverity.warning);
+          severity: CloudLogSeverity.warning);
       _player = PlayerModel();
       await _savePlayerData();
     }
@@ -239,7 +239,7 @@ class PlayerProvider with ChangeNotifier {
       _logger.writeLog(
         message:
             "Player data not ready for saving yet (no UID or player model).",
-        severity: MessageSeverity.warning,
+        severity: CloudLogSeverity.warning,
       );
       return;
     }
@@ -262,7 +262,7 @@ class PlayerProvider with ChangeNotifier {
     } catch (e) {
       _logger.writeLog(
         message: "Error saving player data to Firestore: $e",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           "message": "Error saving player data",
           "context": {
@@ -503,7 +503,7 @@ class PlayerProvider with ChangeNotifier {
       } catch (e) {
         _logger.writeLog(
           message: "Error deleting player document: $e",
-          severity: MessageSeverity.error,
+          severity: CloudLogSeverity.error,
           payload: {
             "message": "Error deleting player document",
             "context": {

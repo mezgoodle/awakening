@@ -4,7 +4,7 @@ import 'package:googleapis/logging/v2.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 
-enum MessageSeverity {
+enum CloudLogSeverity {
   info,
   warning,
   error,
@@ -48,15 +48,15 @@ class CloudLoggerService {
     }
   }
 
-  String _severityToString(MessageSeverity severity) {
+  String _severityToString(CloudLogSeverity severity) {
     switch (severity) {
-      case MessageSeverity.info:
+      case CloudLogSeverity.info:
         return 'INFO';
-      case MessageSeverity.warning:
+      case CloudLogSeverity.warning:
         return 'WARNING';
-      case MessageSeverity.error:
+      case CloudLogSeverity.error:
         return 'ERROR';
-      case MessageSeverity.debug:
+      case CloudLogSeverity.debug:
         return 'DEBUG';
       default:
         return 'UNKNOWN';
@@ -65,7 +65,7 @@ class CloudLoggerService {
 
   Future<void> writeLog({
     required String message,
-    MessageSeverity severity = MessageSeverity.info,
+    CloudLogSeverity severity = CloudLogSeverity.info,
     String logName = 'flutter-app-log',
     Map<String, dynamic>? payload,
   }) async {

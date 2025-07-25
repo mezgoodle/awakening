@@ -62,12 +62,12 @@ class SkillProvider with ChangeNotifier {
       }).toList();
       _logger.writeLog(
         message: "Loaded ${_allSkills.length} skills from Firestore.",
-        severity: MessageSeverity.info,
+        severity: CloudLogSeverity.info,
       );
     } catch (e) {
       _logger.writeLog(
         message: "Error loading skills from Firestore",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           'error': e.toString(),
         },

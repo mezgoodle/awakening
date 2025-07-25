@@ -30,9 +30,6 @@ jobs:
         env:
           GCP_SA_KEY_BASE64: ${{ secrets.GCP_SA_KEY_BASE64 }}
 
-      # - name: Set up Google Cloud credentials
-      #   run: echo "GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/assets/service_account.json" >> $GITHUB_ENV
-
       - name: Create .env file
         run: |
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env

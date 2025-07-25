@@ -180,7 +180,7 @@ $hpCostInstruction
               "prompt": prompt,
               "model": modelName,
             },
-            severity: MessageSeverity.error);
+            severity: CloudLogSeverity.error);
         return null;
       }
 
@@ -200,7 +200,7 @@ $hpCostInstruction
               "prompt": prompt,
               "model": modelName,
             },
-            severity: MessageSeverity.error);
+            severity: CloudLogSeverity.error);
         return null;
       }
 
@@ -223,7 +223,7 @@ $hpCostInstruction
             "prompt": prompt,
             "model": modelName,
           },
-          severity: MessageSeverity.error,
+          severity: CloudLogSeverity.error,
         );
         return null;
       }
@@ -243,7 +243,7 @@ $hpCostInstruction
               "playerRank": player.playerRank.name,
               "model": modelName,
             },
-            severity: MessageSeverity.error,
+            severity: CloudLogSeverity.error,
           );
           difficulty = player.playerRank;
         }
@@ -256,7 +256,7 @@ $hpCostInstruction
             "playerRank": player.playerRank.name,
             "model": modelName,
           },
-          severity: MessageSeverity.warning,
+          severity: CloudLogSeverity.warning,
         );
         difficulty = player.playerRank; // Якщо Gemini не надав ранг
       }
@@ -279,7 +279,7 @@ $hpCostInstruction
                   "prompt": prompt,
                   "model": modelName,
                 },
-                severity: MessageSeverity.warning,
+                severity: CloudLogSeverity.warning,
               );
               return const MapEntry(PlayerStat.strength, 0);
             }
@@ -305,7 +305,7 @@ $hpCostInstruction
               "prompt": prompt,
               "model": modelName,
             },
-            severity: MessageSeverity.warning,
+            severity: CloudLogSeverity.warning,
           );
         }
       }
@@ -334,14 +334,14 @@ $hpCostInstruction
           "prompt": prompt,
           "model": modelName,
         },
-        severity: MessageSeverity.info,
+        severity: CloudLogSeverity.info,
       );
 
       return quest;
     } catch (e) {
       _logger.writeLog(
         message: "Error generating quest with Gemini API: $e",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           "prompt": prompt,
           "model": modelName,
@@ -350,7 +350,7 @@ $hpCostInstruction
       if (e is GenerativeAIException) {
         _logger.writeLog(
           message: "GenerativeAIException details: ${e.message}",
-          severity: MessageSeverity.error,
+          severity: CloudLogSeverity.error,
           payload: {
             "prompt": prompt,
             "model": modelName,

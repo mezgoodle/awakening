@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
         user = userCredential.user;
         _logger.writeLog(
           message: "Signed in anonymously with UID: ${user?.uid}",
-          severity: MessageSeverity.info,
+          severity: CloudLogSeverity.info,
           payload: {
             "message": "User signed in anonymously",
             "context": {
@@ -51,7 +51,7 @@ class _SplashScreenState extends State<SplashScreen> {
       } else {
         _logger.writeLog(
           message: "User already signed in with UID: ${user.uid}",
-          severity: MessageSeverity.info,
+          severity: CloudLogSeverity.info,
           payload: {
             "message": "User already signed in",
             "context": {"id": user.uid},
@@ -84,7 +84,7 @@ class _SplashScreenState extends State<SplashScreen> {
     } catch (e) {
       _logger.writeLog(
         message: "Error during anonymous sign-in: $e",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           "message": "Error during anonymous sign-in",
           "context": {"error": e.toString()},

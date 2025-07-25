@@ -60,7 +60,7 @@ class QuestProvider with ChangeNotifier {
     if (_questsCollectionRef == null) {
       _logger.writeLog(
         message: "Cannot load quests, no user ID.",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
       );
       _isLoading = false;
       notifyListeners();
@@ -105,7 +105,7 @@ class QuestProvider with ChangeNotifier {
     } catch (e) {
       _logger.writeLog(
         message: "Error loading quests from Firestore: $e",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           "message": "Quest loading error",
           "context": {"userId": _playerProvider?.getUserId()}
@@ -144,7 +144,7 @@ class QuestProvider with ChangeNotifier {
     } catch (e) {
       _logger.writeLog(
         message: "Error adding quest '${quest.title}' to Firestore: $e",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           "message": "Quest addition error",
           "context": {
@@ -224,7 +224,7 @@ class QuestProvider with ChangeNotifier {
       } catch (e) {
         _logger.writeLog(
           message: "Error updating quest '$questId' in Firestore: $e",
-          severity: MessageSeverity.error,
+          severity: CloudLogSeverity.error,
           payload: {
             "message": "Quest update error",
             "context": {
@@ -263,7 +263,7 @@ class QuestProvider with ChangeNotifier {
     } catch (e) {
       _logger.writeLog(
         message: "Could not read last daily quest generation date: $e",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           "message": "Daily quest generation date read error",
           "context": {"userId": _playerProvider?.getUserId()}
@@ -329,7 +329,7 @@ class QuestProvider with ChangeNotifier {
               _logger.writeLog(
                   message:
                       "Gemini generated daily quest for ${stat.name}, but targetStat is incorrect. Using fallback.",
-                  severity: MessageSeverity.warning,
+                  severity: CloudLogSeverity.warning,
                   payload: {
                     "message": "Gemini quest targetStat mismatch",
                     "context": {
@@ -346,7 +346,7 @@ class QuestProvider with ChangeNotifier {
             _logger.writeLog(
                 message:
                     "Gemini failed to generate daily quest for ${stat.name}, using fallback.",
-                severity: MessageSeverity.warning,
+                severity: CloudLogSeverity.warning,
                 payload: {
                   "message": "Gemini quest generation failed",
                   "context": {
@@ -370,7 +370,7 @@ class QuestProvider with ChangeNotifier {
       } catch (e) {
         _logger.writeLog(
           message: "Error updating daily quest generation date: $e",
-          severity: MessageSeverity.error,
+          severity: CloudLogSeverity.error,
           payload: {
             "message": "Daily quest generation date update error",
             "context": {"userId": _playerProvider?.getUserId()}
@@ -422,7 +422,7 @@ class QuestProvider with ChangeNotifier {
     } else {
       _logger.writeLog(
         message: "Failed to generate a new quest using Gemini API.",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
       );
       slog.addMessage("Не вдалося згенерувати завдання.", MessageType.error);
     }
@@ -456,7 +456,7 @@ class QuestProvider with ChangeNotifier {
     } catch (e) {
       _logger.writeLog(
         message: "Error deleting all quests from Firestore: $e",
-        severity: MessageSeverity.error,
+        severity: CloudLogSeverity.error,
         payload: {
           "message": "Quest reset error",
           "context": {
