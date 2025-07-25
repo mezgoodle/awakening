@@ -1,9 +1,8 @@
-// lib/screens/splash_screen.dart
-
 import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Імпорт Firebase Auth
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 
 import '../providers/player_provider.dart';
 import 'home_screen.dart';
@@ -43,7 +42,10 @@ class _SplashScreenState extends State<SplashScreen> {
           severity: MessageSeverity.info,
           payload: {
             "message": "User signed in anonymously",
-            "context": {"id": user?.uid},
+            "context": {
+              "id": user?.uid,
+              "platform": defaultTargetPlatform.toString(),
+            },
           },
         );
       } else {

@@ -1,4 +1,3 @@
-import 'package:awakening/providers/skill_provider.dart';
 import 'package:awakening/providers/system_log_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -166,7 +165,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
   @override
   Widget build(BuildContext context) {
     final playerProvider = context.watch<PlayerProvider>();
-    final skillProvider = context.read<SkillProvider>();
     final questProvider = context.read<QuestProvider>();
     final systemLogProvider = context.read<SystemLogProvider>();
 
@@ -494,7 +492,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                       ?.copyWith(fontSize: 16, fontWeight: FontWeight.bold)),
               if (bonus > 0)
                 Text(
-                  ' (+${bonus})',
+                  ' (+$bonus)',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
