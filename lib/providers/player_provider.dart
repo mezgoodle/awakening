@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/providers/quest_provider.dart';
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/player_model.dart';
@@ -20,6 +21,8 @@ class PlayerProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth? _auth;
   String? _uid;
+
+  final CloudLoggerService _logger = CloudLoggerService();
 
   Map<PlayerStat, int>? _modifiedStats;
   final Map<String, DateTime> _skillCooldowns = {};
@@ -100,16 +103,41 @@ class PlayerProvider with ChangeNotifier {
       if (playerSnapshot.exists && playerSnapshot.data() != null) {
         _player = PlayerModel.fromJson(
             playerSnapshot.data()! as Map<String, dynamic>);
-        print("Player data for UID $_uid loaded from Firestore.");
+        _logger.writeLog(
+            message: "Player data for UID $_uid loaded from Firestore.",
+            payload: {
+              "message": "Player data loaded",
+              "context": {
+                "user": {
+                  "playerName": _player!.playerName,
+                  "level": _player!.level,
+                  "xp": _player!.xp,
+                }
+              }
+            });
       } else {
         _player = PlayerModel();
-        print(
-            "No player data in Firestore for UID $_uid, creating new player.");
+        _logger.writeLog(
+            message:
+                "No player data in Firestore for UID $_uid, creating new player.",
+            payload: {
+              "message": "No player data found",
+              "context": {
+                "id": _uid,
+                "user": {
+                  "playerName": _player!.playerName,
+                  "level": _player!.level,
+                  "xp": _player!.xp,
+                }
+              }
+            });
         await _savePlayerData();
       }
     } catch (e) {
-      print(
-          "Error loading player data from Firestore: $e. Creating new player.");
+      _logger.writeLog(
+          message:
+              "Error loading player data from Firestore: $e. Creating new player.",
+          severity: CloudLogSeverity.warning);
       _player = PlayerModel();
       await _savePlayerData();
     }
@@ -125,12 +153,10 @@ class PlayerProvider with ChangeNotifier {
   void _calculateFinalStats() {
     if (_player == null || _skillProvider == null) return;
 
-    // 1. Скидаємо модифікатори до базових значень
     _modifiedStats = Map.from(_player!.stats);
     double maxHpMultiplier = 1.0;
     double maxMpMultiplier = 1.0;
 
-    // 2. Застосовуємо ефекти від пасивних навичок
     for (String skillId in _player!.learnedSkillIds) {
       final skill = _skillProvider!.getSkillById(skillId);
       if (skill != null && skill.skillType == SkillType.passive) {
@@ -157,11 +183,12 @@ class PlayerProvider with ChangeNotifier {
       }
     }
 
-    // 3. Застосовуємо ефекти від активних бафів
     _player!.activeBuffs.removeWhere((skillId, endTimeString) {
       bool isExpired = DateTime.parse(endTimeString).isBefore(DateTime.now());
-      if (isExpired) print("Buff for skill $skillId has expired.");
-      return isExpired;
+      if (isExpired) {
+        return isExpired;
+      }
+      return false;
     });
 
     for (String skillId in _player!.activeBuffs.keys) {
@@ -190,7 +217,6 @@ class PlayerProvider with ChangeNotifier {
       }
     }
 
-    // 4. Перераховуємо HP/MP на основі фінальних модифікованих статів
     int stamina = _modifiedStats![PlayerStat.stamina] ?? 0;
     int intelligence = _modifiedStats![PlayerStat.intelligence] ?? 0;
     _modifiedMaxHp = (((_player!.level * PlayerModel.baseHpPerLevel) +
@@ -210,14 +236,42 @@ class PlayerProvider with ChangeNotifier {
 
   Future<void> _savePlayerData() async {
     if (_playerDocRef == null || _player == null) {
-      print("Player data not ready for saving yet (no UID or player model).");
+      _logger.writeLog(
+        message:
+            "Player data not ready for saving yet (no UID or player model).",
+        severity: CloudLogSeverity.warning,
+      );
       return;
     }
     try {
       await _playerDocRef!.set(_player!.toJson());
-      print("Player data for UID $_uid saved to Firestore.");
+      _logger.writeLog(
+        message: "Player data for UID $_uid saved to Firestore.",
+        payload: {
+          "message": "Player data saved",
+          "context": {
+            "id": _uid,
+            "user": {
+              "playerName": _player!.playerName,
+              "level": _player!.level,
+              "xp": _player!.xp,
+            }
+          }
+        },
+      );
     } catch (e) {
-      print("Error saving player data to Firestore: $e");
+      _logger.writeLog(
+        message: "Error saving player data to Firestore: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Error saving player data",
+          "context": {
+            "id": _uid,
+            "error": e.toString(),
+            "platform": defaultTargetPlatform.toString()
+          },
+        },
+      );
     }
   }
 
@@ -234,7 +288,6 @@ class PlayerProvider with ChangeNotifier {
   void _checkLevelUp(SystemLogProvider? slog) {
     if (_player == null) return;
     bool leveledUpThisCheck = false;
-    QuestDifficulty oldRank = _player!.playerRank; // Зберігаємо старий ранг
     int oldAvailablePoints = _player!.availableStatPoints;
 
     while (_player!.xp >= _player!.xpToNextLevel) {
@@ -261,8 +314,6 @@ class PlayerProvider with ChangeNotifier {
         slog?.addMessage("Отримано $pointsGained оч. характеристик!",
             MessageType.statsIncreased);
       }
-      // Логіка зміни рангу тепер в awardNewRank або requestRankUpChallenge
-      // _checkForAvailableRankUpChallenge();
     }
   }
 
@@ -380,9 +431,9 @@ class PlayerProvider with ChangeNotifier {
 
   void applyInitialStatBonuses(Map<PlayerStat, int> bonuses) {
     if (_isLoading || _player!.initialSurveyCompleted) {
-      if (_player!.initialSurveyCompleted)
-        print("Initial stat bonuses already applied.");
-      return;
+      if (_player!.initialSurveyCompleted) {
+        return;
+      }
     }
 
     bool statsAffectingHpMpChanged = false;
@@ -392,8 +443,6 @@ class PlayerProvider with ChangeNotifier {
         if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
           statsAffectingHpMpChanged = true;
         }
-        print(
-            "Applied +$bonusAmount bonus to ${PlayerModel.getStatName(stat)} from survey.");
       }
     });
 
@@ -444,9 +493,26 @@ class PlayerProvider with ChangeNotifier {
     if (_playerDocRef != null) {
       try {
         await _playerDocRef!.delete();
-        print("Player document for UID $_uid deleted from Firestore.");
+        _logger.writeLog(
+          message: "Player document for UID $_uid deleted from Firestore.",
+          payload: {
+            "message": "Player data reset",
+            "context": {"id": _uid}
+          },
+        );
       } catch (e) {
-        print("Error deleting player document: $e");
+        _logger.writeLog(
+          message: "Error deleting player document: $e",
+          severity: CloudLogSeverity.error,
+          payload: {
+            "message": "Error deleting player document",
+            "context": {
+              "id": _uid,
+              "error": e.toString(),
+              "platform": defaultTargetPlatform.toString()
+            },
+          },
+        );
       }
     }
     _player = PlayerModel();
@@ -454,7 +520,13 @@ class PlayerProvider with ChangeNotifier {
     _justLeveledUp = false;
     await _savePlayerData();
     notifyListeners();
-    print("Player data has been reset in Firestore.");
+    _logger.writeLog(
+      message: "Player data has been reset in Firestore.",
+      payload: {
+        "message": "Player data reset",
+        "context": {"id": _uid}
+      },
+    );
   }
 
   void awardNewRank(QuestDifficulty newRank, SystemLogProvider slog) {
@@ -464,7 +536,6 @@ class PlayerProvider with ChangeNotifier {
       slog.addMessage(
           "Ранг Мисливця підвищено! Новий ранг: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
           MessageType.rankUp);
-      print("RANK UP! Awarded new rank: ${_player!.playerRank.name}");
       _savePlayerData(); // Зберігаємо зміни
       notifyListeners();
       // _checkForAvailableRankUpChallenge(); // Перевіряємо, чи доступний наступний ранг-ап
@@ -487,8 +558,6 @@ class PlayerProvider with ChangeNotifier {
           QuestDifficulty.values[currentRank.index + 1];
 
       if (targetRankForChallenge.index > nextPotentialRankByLevel.index) {
-        print(
-            "Cannot request rank up challenge yet. Level ${player.level} too low for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)} rank challenge (needs level for ${QuestModel.getQuestDifficultyName(nextPotentialRankByLevel)}).");
         slog.addMessage(
             "Рівень ${player.level} недостатній для випробування на ранг ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}.",
             MessageType.info);

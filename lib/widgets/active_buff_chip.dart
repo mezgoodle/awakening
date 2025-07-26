@@ -1,9 +1,7 @@
-// lib/widgets/active_buff_chip.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/skill_model.dart';
+
 import '../providers/skill_provider.dart';
 
 class ActiveBuffChip extends StatefulWidget {

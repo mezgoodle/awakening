@@ -7,6 +7,7 @@ import 'player_provider.dart';
 import 'system_log_provider.dart';
 import '../services/gemini_quest_service.dart';
 import '../models/system_message_model.dart';
+import '../services/cloud_logger_service.dart';
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
@@ -18,7 +19,8 @@ class QuestProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   PlayerProvider? _playerProvider;
 
-  // Ключ для збереження дати останньої генерації в документі гравця
+  final CloudLoggerService _logger = CloudLoggerService();
+
   static const String _lastDailyQuestGenerationKey =
       'lastDailyQuestGenerationDate';
 
@@ -38,7 +40,6 @@ class QuestProvider with ChangeNotifier {
     } else if (playerProvider == null) {
       _activeQuests.clear();
       _completedQuests.clear();
-      // Не викликаємо notifyListeners, бо провайдер "вимикається"
     }
   }
 
@@ -57,7 +58,10 @@ class QuestProvider with ChangeNotifier {
 
   Future<void> _loadQuests() async {
     if (_questsCollectionRef == null) {
-      print("QuestProvider: Cannot load quests, no user ID.");
+      _logger.writeLog(
+        message: "Cannot load quests, no user ID.",
+        severity: CloudLogSeverity.error,
+      );
       _isLoading = false;
       notifyListeners();
       return;
@@ -74,7 +78,13 @@ class QuestProvider with ChangeNotifier {
           .map(
               (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
           .toList();
-      print("Loaded ${_activeQuests.length} active quests from Firestore.");
+      _logger.writeLog(
+        message: "Loaded ${_activeQuests.length} active quests from Firestore.",
+        payload: {
+          "message": "Active quests loaded",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
 
       final completedSnapshot = await _questsCollectionRef!
           .where('isCompleted', isEqualTo: true)
@@ -85,10 +95,22 @@ class QuestProvider with ChangeNotifier {
           .map(
               (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
           .toList();
-      print(
-          "Loaded ${_completedQuests.length} completed quests from Firestore.");
+      _logger.writeLog(
+          message:
+              "Loaded ${_completedQuests.length} completed quests from Firestore.",
+          payload: {
+            "message": "Completed quests loaded",
+            "context": {"userId": _playerProvider?.getUserId()}
+          });
     } catch (e) {
-      print("Error loading quests from Firestore: $e");
+      _logger.writeLog(
+        message: "Error loading quests from Firestore: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Quest loading error",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
       _activeQuests = [];
       _completedQuests = [];
     }
@@ -108,9 +130,31 @@ class QuestProvider with ChangeNotifier {
 
     try {
       await _questsCollectionRef!.doc(quest.id).set(quest.toJson());
-      print("Quest '${quest.title}' added to Firestore.");
+      _logger.writeLog(
+        message: "Quest '${quest.title}' added to Firestore.",
+        payload: {
+          "message": "Quest added",
+          "context": {
+            "questId": quest.id,
+            "questTitle": quest.title,
+            "userId": _playerProvider?.getUserId()
+          }
+        },
+      );
     } catch (e) {
-      print("Error adding quest to Firestore: $e");
+      _logger.writeLog(
+        message: "Error adding quest '${quest.title}' to Firestore: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Quest addition error",
+          "context": {
+            "questId": quest.id,
+            "questTitle": quest.title,
+            "userId": _playerProvider?.getUserId(),
+            "error": e.toString()
+          }
+        },
+      );
       slog.addMessage(
           "Помилка збереження завдання '${quest.title}'", MessageType.error);
       _activeQuests.removeWhere((q) => q.id == quest.id);
@@ -166,9 +210,31 @@ class QuestProvider with ChangeNotifier {
           'isCompleted': true,
           'completedAt': quest.completedAt?.toIso8601String(),
         });
-        print("Quest '$questId' marked as completed in Firestore.");
+        _logger.writeLog(
+          message: "Quest '$questId' marked as completed in Firestore.",
+          payload: {
+            "message": "Quest completed",
+            "context": {
+              "questId": quest.id,
+              "questTitle": quest.title,
+              "userId": _playerProvider?.getUserId()
+            }
+          },
+        );
       } catch (e) {
-        print("Error updating quest in Firestore: $e");
+        _logger.writeLog(
+          message: "Error updating quest '$questId' in Firestore: $e",
+          severity: CloudLogSeverity.error,
+          payload: {
+            "message": "Quest update error",
+            "context": {
+              "questId": quest.id,
+              "questTitle": quest.title,
+              "userId": _playerProvider?.getUserId(),
+              "error": e.toString()
+            }
+          },
+        );
         slog.addMessage("Помилка оновлення статусу завдання '${quest.title}'",
             MessageType.error);
         _completedQuests.removeWhere((q) => q.id == questId);
@@ -195,7 +261,14 @@ class QuestProvider with ChangeNotifier {
         lastGenerationDateStr = data[_lastDailyQuestGenerationKey];
       }
     } catch (e) {
-      print("Could not read last daily quest generation date: $e");
+      _logger.writeLog(
+        message: "Could not read last daily quest generation date: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Daily quest generation date read error",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
     }
 
     final today = DateTime.now();
@@ -205,19 +278,13 @@ class QuestProvider with ChangeNotifier {
       final lastGenerationDate = DateTime.parse(lastGenerationDateStr);
       if (lastGenerationDate == todayDateOnly) {
         shouldGenerate = false;
-        print("Daily quests already generated today.");
       }
     }
 
     if (shouldGenerate) {
       if (playerProvider.isLoading) {
-        print(
-            "Player data is still loading. Skipping daily quest generation for now.");
         return;
       }
-
-      print(
-          "Generating daily quests for ${todayDateOnly.toIso8601String()}...");
       // Видалення старих невиконаних щоденних квестів з UI та БД
       final oldDailies =
           _activeQuests.where((q) => q.type == QuestType.daily).toList();
@@ -228,7 +295,14 @@ class QuestProvider with ChangeNotifier {
           batch.delete(_questsCollectionRef!.doc(quest.id));
         }
         await batch.commit();
-        print("Removed ${oldDailies.length} old daily quests.");
+        _logger.writeLog(
+          message:
+              "Removed ${oldDailies.length} old daily quests from Firestore.",
+          payload: {
+            "message": "Old daily quests removed",
+            "context": {"userId": _playerProvider?.getUserId()}
+          },
+        );
       }
       notifyListeners();
 
@@ -252,37 +326,56 @@ class QuestProvider with ChangeNotifier {
             // Перевірка, чи Gemini згенерував квест для правильного стату. Якщо ні - використовуємо fallback.
             if (generatedQuest.targetStat == null ||
                 generatedQuest.targetStat != stat) {
-              print(
-                  "Gemini daily quest had incorrect targetStat. Using fallback for ${stat.name}.");
+              _logger.writeLog(
+                  message:
+                      "Gemini generated daily quest for ${stat.name}, but targetStat is incorrect. Using fallback.",
+                  severity: CloudLogSeverity.warning,
+                  payload: {
+                    "message": "Gemini quest targetStat mismatch",
+                    "context": {
+                      "stat": stat.name,
+                      "questId": generatedQuest.id,
+                      "userId": _playerProvider?.getUserId()
+                    }
+                  });
               questToAdd = _getFallbackDailyQuestForStat(stat, currentPlayer);
             } else {
               questToAdd = generatedQuest;
             }
           } else {
-            print(
-                "Gemini failed to generate daily quest for ${stat.name}, using fallback.");
+            _logger.writeLog(
+                message:
+                    "Gemini failed to generate daily quest for ${stat.name}, using fallback.",
+                severity: CloudLogSeverity.warning,
+                payload: {
+                  "message": "Gemini quest generation failed",
+                  "context": {
+                    "stat": stat.name,
+                    "userId": _playerProvider?.getUserId()
+                  }
+                });
             questToAdd = _getFallbackDailyQuestForStat(stat, currentPlayer);
           }
-          // Додаємо квест. Не показуємо снекбар для кожного.
           await addQuest(questToAdd, slog, showSnackbar: false);
         }));
       }
 
-      // Чекаємо завершення всіх генерацій
       await Future.wait(questGenerationFutures);
       slog.addMessage("Щоденні завдання оновлено.", MessageType.info);
 
-      // 2. Зберігаємо нову дату генерації в документі гравця в Firestore
       try {
         await _playerDocRef!.set(
             {_lastDailyQuestGenerationKey: todayDateOnly.toIso8601String()},
-            SetOptions(
-                merge:
-                    true) // merge: true, щоб не перезаписати інші дані гравця
-            );
-        print("Daily quest generation date updated in Firestore.");
+            SetOptions(merge: true));
       } catch (e) {
-        print("Error updating daily quest generation date: $e");
+        _logger.writeLog(
+          message: "Error updating daily quest generation date: $e",
+          severity: CloudLogSeverity.error,
+          payload: {
+            "message": "Daily quest generation date update error",
+            "context": {"userId": _playerProvider?.getUserId()}
+          },
+        );
       }
 
       _isGeneratingQuest = false;
@@ -292,10 +385,8 @@ class QuestProvider with ChangeNotifier {
 
   QuestModel _getFallbackDailyQuestForStat(
       PlayerStat stat, PlayerModel player) {
-    // ... (Цей метод залишається без змін, оскільки він не взаємодіє з базою даних)
     int xpBase = 15 + (player.level * 2);
     switch (stat) {
-      // ... (всі case-и)
       default:
         return QuestModel(
             title: "Default Daily",
@@ -329,7 +420,10 @@ class QuestProvider with ChangeNotifier {
     if (newQuest != null) {
       await addQuest(newQuest, slog); // Тепер викликаємо асинхронний метод
     } else {
-      print("Failed to generate a new quest using Gemini API.");
+      _logger.writeLog(
+        message: "Failed to generate a new quest using Gemini API.",
+        severity: CloudLogSeverity.error,
+      );
       slog.addMessage("Не вдалося згенерувати завдання.", MessageType.error);
     }
 
@@ -352,9 +446,25 @@ class QuestProvider with ChangeNotifier {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      print("All quests deleted from Firestore for the user.");
+      _logger.writeLog(
+        message: "All quests deleted from Firestore for the user.",
+        payload: {
+          "message": "All quests reset",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
     } catch (e) {
-      print("Error deleting all quests from Firestore: $e");
+      _logger.writeLog(
+        message: "Error deleting all quests from Firestore: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Quest reset error",
+          "context": {
+            "userId": _playerProvider?.getUserId(),
+            "error": e.toString()
+          }
+        },
+      );
     }
   }
 }

@@ -1,4 +1,3 @@
-import 'package:awakening/providers/skill_provider.dart';
 import 'package:awakening/providers/system_log_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -131,7 +130,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             const SizedBox(width: 8),
             Text(
               '$label: $currentValue / $maxValue',
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 15,
                   color: Colors.white70,
                   fontWeight: FontWeight.w600),
@@ -166,7 +165,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
   @override
   Widget build(BuildContext context) {
     final playerProvider = context.watch<PlayerProvider>();
-    final skillProvider = context.read<SkillProvider>();
     final questProvider = context.read<QuestProvider>();
     final systemLogProvider = context.read<SystemLogProvider>();
 
@@ -266,8 +264,8 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               player.playerName,
               actionWidget: IconButton(
                 // Додаємо кнопку редагування
-                icon:
-                    Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
+                icon: const Icon(Icons.edit_outlined,
+                    color: Colors.white70, size: 20),
                 tooltip: 'Редагувати ім\'я',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -494,7 +492,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                       ?.copyWith(fontSize: 16, fontWeight: FontWeight.bold)),
               if (bonus > 0)
                 Text(
-                  ' (+${bonus})',
+                  ' (+$bonus)',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

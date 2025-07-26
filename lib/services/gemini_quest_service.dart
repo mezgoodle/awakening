@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/player_model.dart';
@@ -6,10 +7,13 @@ import '../models/quest_model.dart';
 
 class GeminiQuestService {
   final GenerativeModel _model;
+  final CloudLoggerService _logger = CloudLoggerService();
+
+  static const String modelName = 'gemini-2.0-flash-001';
 
   GeminiQuestService()
       : _model = GenerativeModel(
-            model: 'gemini-2.0-flash-001',
+            model: modelName,
             apiKey: dotenv.env['GEMINI_API_KEY']!,
             safetySettings: [
               SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
@@ -170,11 +174,16 @@ $hpCostInstruction
       // print("----------------");
 
       if (response.text == null || response.text!.isEmpty) {
-        print("Gemini API: Empty response.");
+        _logger.writeLog(
+            message: "Gemini API returned empty response",
+            payload: {
+              "prompt": prompt,
+              "model": modelName,
+            },
+            severity: CloudLogSeverity.error);
         return null;
       }
 
-      // Спробуємо знайти JSON у відповіді, навіть якщо є зайвий текст (хоча промпт просить тільки JSON)
       String jsonString = response.text!;
       final jsonStartIndex = jsonString.indexOf('{');
       final jsonEndIndex = jsonString.lastIndexOf('}');
@@ -184,19 +193,38 @@ $hpCostInstruction
           jsonEndIndex > jsonStartIndex) {
         jsonString = jsonString.substring(jsonStartIndex, jsonEndIndex + 1);
       } else {
-        print(
-            "Gemini API: No valid JSON object found in response: ${response.text}");
+        _logger.writeLog(
+            message: "Gemini API returned invalid JSON response",
+            payload: {
+              "response": response.text,
+              "prompt": prompt,
+              "model": modelName,
+            },
+            severity: CloudLogSeverity.error);
         return null;
       }
 
       final Map<String, dynamic> jsonResponse = jsonDecode(jsonString);
 
-      // Валідація та створення QuestModel
       if (jsonResponse['title'] == null ||
           jsonResponse['description'] == null ||
           jsonResponse['difficulty'] == null ||
           jsonResponse['xpReward'] == null) {
-        print("Gemini API: Missing required fields in JSON response.");
+        _logger.writeLog(
+          message: "Gemini API response missing required fields",
+          payload: {
+            "response": jsonResponse,
+            "fields": {
+              "title": jsonResponse['title'],
+              "description": jsonResponse['description'],
+              "difficulty": jsonResponse['difficulty'],
+              "xpReward": jsonResponse['xpReward'],
+            },
+            "prompt": prompt,
+            "model": modelName,
+          },
+          severity: CloudLogSeverity.error,
+        );
         return null;
       }
 
@@ -206,14 +234,30 @@ $hpCostInstruction
           difficulty = QuestDifficulty.values
               .byName(jsonResponse['difficulty'].toString().toUpperCase());
         } catch (e) {
-          print(
-              "Gemini API: Invalid difficulty value: ${jsonResponse['difficulty']}. Defaulting to player rank: ${player.playerRank.name}.");
-          difficulty = player
-              .playerRank; // Якщо Gemini помилився з рангом, ставимо ранг гравця
+          _logger.writeLog(
+            message:
+                "Gemini API returned invalid difficulty value: ${jsonResponse['difficulty']}",
+            payload: {
+              "difficulty": jsonResponse['difficulty'],
+              "prompt": prompt,
+              "playerRank": player.playerRank.name,
+              "model": modelName,
+            },
+            severity: CloudLogSeverity.error,
+          );
+          difficulty = player.playerRank;
         }
       } else {
-        print(
-            "Gemini API: No difficulty provided. Defaulting to player rank: ${player.playerRank.name}.");
+        _logger.writeLog(
+          message:
+              "Gemini API: No difficulty provided. Defaulting to player rank: ${player.playerRank.name}.",
+          payload: {
+            "prompt": prompt,
+            "playerRank": player.playerRank.name,
+            "model": modelName,
+          },
+          severity: CloudLogSeverity.warning,
+        );
         difficulty = player.playerRank; // Якщо Gemini не надав ранг
       }
 
@@ -226,17 +270,22 @@ $hpCostInstruction
               return MapEntry(
                   PlayerStat.values.byName(key.toLowerCase()), value as int);
             } catch (e) {
-              print(
-                  "Gemini API: Invalid stat name '$key' in statRewards. Skipping.");
-              return MapEntry(
-                  PlayerStat.strength, 0); // Placeholder, буде відфільтровано
+              _logger.writeLog(
+                message:
+                    "Gemini API: Invalid stat name '$key' in statRewards. Skipping.",
+                payload: {
+                  "statName": key,
+                  "value": value,
+                  "prompt": prompt,
+                  "model": modelName,
+                },
+                severity: CloudLogSeverity.warning,
+              );
+              return const MapEntry(PlayerStat.strength, 0);
             }
           },
-        )..removeWhere((key, value) =>
-            value == 0 &&
-            key ==
-                PlayerStat
-                    .strength); // Видаляємо плейсхолдер, якщо він залишився
+        )..removeWhere(
+            (key, value) => value == 0 && key == PlayerStat.strength);
         if (statRewards.isEmpty) statRewards = null;
       }
 
@@ -248,8 +297,16 @@ $hpCostInstruction
           parsedTargetStat = PlayerStat.values
               .byName(jsonResponse['targetStat'].toString().toLowerCase());
         } catch (e) {
-          print(
-              "Gemini API: Invalid targetStat value: ${jsonResponse['targetStat']}. Setting to null.");
+          _logger.writeLog(
+            message:
+                "Gemini API: Invalid targetStat value: ${jsonResponse['targetStat']}. Defaulting to null.",
+            payload: {
+              "targetStat": jsonResponse['targetStat'],
+              "prompt": prompt,
+              "model": modelName,
+            },
+            severity: CloudLogSeverity.warning,
+          );
         }
       }
 
@@ -260,20 +317,45 @@ $hpCostInstruction
         if (hpCost == 0) hpCost = null;
       }
 
-      return QuestModel(
+      final quest = QuestModel(
         title: jsonResponse['title'],
         description: jsonResponse['description'],
         xpReward: (jsonResponse['xpReward'] as num).toInt(),
         difficulty: difficulty,
-        type: questType, // Тип, який ми передали для генерації
+        type: questType,
         targetStat: parsedTargetStat ?? targetStat,
         hpCostOnCompletion: hpCost,
       );
+      _logger.writeLog(
+        message: "Quest generated successfully",
+        payload: {
+          "message": "Quest generated successfully",
+          "quest": quest.toJson(),
+          "prompt": prompt,
+          "model": modelName,
+        },
+        severity: CloudLogSeverity.info,
+      );
+
+      return quest;
     } catch (e) {
-      print("Error generating quest with Gemini API: $e");
+      _logger.writeLog(
+        message: "Error generating quest with Gemini API: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "prompt": prompt,
+          "model": modelName,
+        },
+      );
       if (e is GenerativeAIException) {
-        print("GenerativeAIException details: ${e.message}");
-        // Можна перевірити e.promptFeedback або e.finishReason для деталей
+        _logger.writeLog(
+          message: "GenerativeAIException details: ${e.message}",
+          severity: CloudLogSeverity.error,
+          payload: {
+            "prompt": prompt,
+            "model": modelName,
+          },
+        );
       }
       return null;
     }
