@@ -116,8 +116,6 @@ class _SkillCardState extends State<SkillCard> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Це може бути кращим місцем для запуску таймера,
-    // оскільки провайдери вже точно доступні.
     _startTimerIfNeeded();
   }
 
