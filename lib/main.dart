@@ -1,3 +1,4 @@
+import 'package:awakening/providers/item_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -38,17 +39,21 @@ Future<void> main() async {
         ),
         // SkillProvider поки що не залежить від інших, тому створюємо його тут.
         ChangeNotifierProvider(create: (_) => SkillProvider()),
+        // ItemProvider також не має залежностей, тому створюємо його тут.
+        ChangeNotifierProvider(create: (_) => ItemProvider()),
 
         // --- 2. Провайдери, що Залежать від Інших (Проксі-Провайдери) ---
 
-        // PlayerProvider залежить від FirebaseAuth та SkillProvider.
-        ChangeNotifierProxyProvider2<FirebaseAuth, SkillProvider,
+        // PlayerProvider залежить від FirebaseAuth та SkillProvider, ItemProvider.
+        ChangeNotifierProxyProvider3<FirebaseAuth, SkillProvider, ItemProvider,
             PlayerProvider>(
           create: (context) =>
-              PlayerProvider(null, null, null), // Початкове створення
-          update: (context, auth, skillProvider, previousPlayerProvider) {
+              PlayerProvider(null, null, null, null), // Початкове створення
+          update: (context, auth, skillProvider, itemProvider,
+              previousPlayerProvider) {
             // Оновлюємо PlayerProvider, передаючи йому актуальні залежності.
-            previousPlayerProvider!.update(auth, skillProvider, null);
+            previousPlayerProvider!
+                .update(auth, skillProvider, itemProvider, null);
             return previousPlayerProvider;
           },
         ),
