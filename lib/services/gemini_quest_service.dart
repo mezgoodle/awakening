@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:awakening/models/inventory_item_model.dart';
 import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -142,6 +143,14 @@ $hpCostInstruction
     Якщо є фокусна характеристика (targetStat) і її значення у гравця високе, XP може бути трохи більшим для відповідного рангу. Якщо низьке - трохи меншим.
 5.  Фокусна характеристика (опціонально, але ОБОВ'ЯЗКОВО якщо передано targetStat для генерації): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив. Має збігатися з переданим targetStat, якщо він був.
 
+Додаткова інструкція щодо нагород-предметів:
+Для деяких квестів (приблизно 15-20% випадків), особливо якщо вони складні або унікальні, ти можеш додати нагороду у вигляді предмету.
+Якщо додаєш предмет, включи в JSON відповідь поле:
+"itemRewards": [ { "itemId": "string", "quantity": integer } ]
+Можливі itemId: "${InventoryItem.smallHealthPotionId}".
+Приклад: "itemRewards": [ { "itemId": "${InventoryItem.smallHealthPotionId}", "quantity": 1 } ]
+Якщо нагороди у вигляді предметів немає, не додавай це поле або встанови null.
+
 Надай відповідь ТІЛЬКИ у форматі JSON об'єкту з такими полями (використовуй подвійні лапки для ключів та рядкових значень):
 "title": "string",
 "description": "string",
@@ -149,6 +158,7 @@ $hpCostInstruction
 "xpReward": integer,
 "targetStat": "stat_name_english" (або null, але має бути заповнено, якщо завдання генерується для конкретного targetStat)
 "hpCostOnCompletion": integer (або null)
+"itemRewards": [ { "itemId": "string", "quantity": integer } ] (або null)
 
 Приклад бажаного JSON (не копіюй його, це лише приклад структури):
 {
@@ -310,6 +320,14 @@ $hpCostInstruction
         }
       }
 
+      List<Map<String, dynamic>>? itemRewards;
+      if (jsonResponse['itemRewards'] != null &&
+          jsonResponse['itemRewards'] is List) {
+        itemRewards = (jsonResponse['itemRewards'] as List<dynamic>)
+            .map((item) => item as Map<String, dynamic>)
+            .toList();
+      }
+
       int? hpCost = jsonResponse['hpCostOnCompletion'] as int?;
       if (hpCost != null) {
         if (hpCost < 0) hpCost = 0;
@@ -325,6 +343,7 @@ $hpCostInstruction
         type: questType,
         targetStat: parsedTargetStat ?? targetStat,
         hpCostOnCompletion: hpCost,
+        itemRewards: itemRewards,
       );
       _logger.writeLog(
         message: "Quest generated successfully",

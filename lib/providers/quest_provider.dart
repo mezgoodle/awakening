@@ -177,6 +177,21 @@ class QuestProvider with ChangeNotifier {
       notifyListeners();
 
       playerProvider.addXp(quest.xpReward, slog);
+
+      if (quest.itemRewards != null && quest.itemRewards!.isNotEmpty) {
+        for (var itemData in quest.itemRewards!) {
+          final itemId = itemData['itemId'] as String?;
+          final quantity = itemData['quantity'] as int?;
+
+          if (itemId != null && quantity != null && quantity > 0) {
+            playerProvider.addItemToInventory(itemId, quantity);
+            slog.addMessage(
+                "Отримано предмет: $itemId (x$quantity)", MessageType.info,
+                showInSnackbar: true);
+          }
+        }
+      }
+
       if (quest.hpCostOnCompletion != null && quest.hpCostOnCompletion! > 0) {
         playerProvider.takePlayerDamage(quest.hpCostOnCompletion!);
         slog.addMessage(
