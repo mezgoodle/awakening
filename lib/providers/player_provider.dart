@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'dart:async';
 
+import 'package:awakening/models/inventory_item_model.dart';
 import 'package:awakening/models/system_message_model.dart';
+import 'package:awakening/providers/item_provider.dart';
 import 'package:awakening/providers/quest_provider.dart';
 import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -35,6 +37,8 @@ class PlayerProvider with ChangeNotifier {
 
   SkillProvider? _skillProvider;
 
+  ItemProvider? _itemProvider;
+
   PlayerModel get player {
     _player ??= PlayerModel();
     return _player!;
@@ -53,8 +57,8 @@ class PlayerProvider with ChangeNotifier {
     return false;
   }
 
-  PlayerProvider(
-      this._auth, SkillProvider? skillProvider, PlayerModel? initialPlayer) {
+  PlayerProvider(this._auth, SkillProvider? skillProvider, this._itemProvider,
+      PlayerModel? initialPlayer) {
     _skillProvider = skillProvider;
     _player = initialPlayer;
     _uid = _auth?.currentUser?.uid;
@@ -65,9 +69,14 @@ class PlayerProvider with ChangeNotifier {
     }
   }
 
-  void update(FirebaseAuth? auth, SkillProvider? skillProvider,
-      PlayerModel? newPlayer) {
+  void update(
+    FirebaseAuth? auth,
+    SkillProvider? skillProvider,
+    ItemProvider? itemProvider,
+    PlayerModel? newPlayer,
+  ) {
     _skillProvider = skillProvider;
+    _itemProvider = itemProvider;
     if (auth?.currentUser?.uid != _uid) {
       _uid = auth?.currentUser?.uid;
       if (_uid != null) {
@@ -585,7 +594,73 @@ class PlayerProvider with ChangeNotifier {
     return false;
   }
 
-  // Метод _checkForAvailableRankUpChallenge (якщо він був і потрібен)
-  // Тепер він не потрібен, бо логіка перевірки винесена в requestRankUpChallenge
-  // та в UI для відображення кнопки.
+  void addItemToInventory(String itemId, int quantity) {
+    if (_player == null || _itemProvider == null) return;
+
+    final templateItem = _itemProvider!.getItemById(itemId);
+    if (templateItem == null) {
+      print("Attempted to add non-existent item: $itemId");
+      return;
+    }
+
+    // Шукаємо, чи є вже такий предмет в інвентарі (якщо він stackable)
+    final existingItemIndex = _player!.inventory.indexWhere(
+        (item) => item['itemId'] == itemId && templateItem.isStackable);
+
+    if (existingItemIndex != -1) {
+      // Якщо є, збільшуємо кількість
+      _player!.inventory[existingItemIndex]['quantity'] += quantity;
+    } else {
+      // Якщо немає, додаємо новий запис
+      _player!.inventory.add({'itemId': itemId, 'quantity': quantity});
+    }
+
+    print("Added $quantity x $itemId to inventory.");
+    _savePlayerData();
+    notifyListeners();
+  }
+
+  // Метод для використання предмету
+  void useItem(String itemId, SystemLogProvider slog) {
+    if (_player == null || _itemProvider == null) return;
+
+    final itemIndex =
+        _player!.inventory.indexWhere((item) => item['itemId'] == itemId);
+    if (itemIndex == -1) return; // Предмета немає
+
+    final templateItem = _itemProvider!.getItemById(itemId);
+    if (templateItem == null) return;
+
+    // Застосовуємо ефекти
+    bool itemUsed = false;
+    templateItem.effects.forEach((effect, value) {
+      switch (effect) {
+        case ItemEffectType.restoreHp:
+          restorePlayerHp(value.toInt());
+          itemUsed = true;
+          slog.addMessage("Відновлено ${value.toInt()} HP.", MessageType.info);
+          break;
+        case ItemEffectType.restoreMp:
+          restorePlayerMp(value.toInt());
+          itemUsed = true;
+          slog.addMessage("Відновлено ${value.toInt()} MP.", MessageType.info);
+          break;
+        // ... інші ефекти
+        default:
+          break;
+      }
+    });
+
+    // Якщо предмет був використаний (витратний матеріал), зменшуємо кількість
+    if (itemUsed && templateItem.type == ItemType.potion) {
+      _player!.inventory[itemIndex]['quantity'] -= 1;
+      // Якщо кількість стала 0, видаляємо предмет з інвентарю
+      if (_player!.inventory[itemIndex]['quantity'] <= 0) {
+        _player!.inventory.removeAt(itemIndex);
+      }
+    }
+
+    _savePlayerData();
+    notifyListeners();
+  }
 }
