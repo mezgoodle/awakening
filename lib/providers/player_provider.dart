@@ -184,11 +184,7 @@ class PlayerProvider with ChangeNotifier {
     }
 
     _player!.activeBuffs.removeWhere((skillId, endTimeString) {
-      bool isExpired = DateTime.parse(endTimeString).isBefore(DateTime.now());
-      if (isExpired) {
-        return isExpired;
-      }
-      return false;
+      return DateTime.parse(endTimeString).isBefore(DateTime.now());
     });
 
     for (String skillId in _player!.activeBuffs.keys) {
