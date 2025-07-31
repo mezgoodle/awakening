@@ -599,7 +599,14 @@ class PlayerProvider with ChangeNotifier {
 
     final templateItem = _itemProvider!.getItemById(itemId);
     if (templateItem == null) {
-      print("Attempted to add non-existent item: $itemId");
+      _logger.writeLog(
+        message: "Attempted to add non-existent item: $itemId",
+        severity: CloudLogSeverity.warning,
+        payload: {
+          "message": "Attempted to add non-existent item",
+          "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
+        },
+      );
       return;
     }
 
@@ -615,7 +622,13 @@ class PlayerProvider with ChangeNotifier {
       _player!.inventory.add({'itemId': itemId, 'quantity': quantity});
     }
 
-    print("Added $quantity x $itemId to inventory.");
+    _logger.writeLog(
+      message: "Added $quantity x $itemId to inventory for player $_uid.",
+      payload: {
+        "message": "Item added to inventory",
+        "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
+      },
+    );
     _savePlayerData();
     notifyListeners();
   }
