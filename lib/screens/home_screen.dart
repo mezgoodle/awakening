@@ -1,3 +1,4 @@
+import 'package:awakening/screens/inventory_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'player_status_screen.dart';
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const PlayerStatusScreen(),
     const QuestsScreen(),
     const SkillsScreen(),
+    const InventoryScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -180,6 +182,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.star_purple500_outlined),
             activeIcon: Icon(Icons.star_purple500),
             label: 'Навички',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2_outlined),
+            activeIcon: Icon(Icons.inventory_2),
+            label: 'Інвентар',
           ),
         ],
         currentIndex: _selectedIndex,

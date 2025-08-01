@@ -3,11 +3,11 @@ import 'dart:math';
 import 'quest_model.dart';
 
 enum PlayerStat {
-  strength, // Сила
-  agility, // Спритність
-  intelligence, // Інтелект
-  perception, // Сприйняття
-  stamina, // Витривалість
+  strength,
+  agility,
+  intelligence,
+  perception,
+  stamina,
 }
 
 enum PhysicalActivity {
@@ -41,22 +41,26 @@ class PlayerModel {
   static const int baseMpPerLevel = 5;
   static const int mpPerIntelligencePoint = 3;
 
-  PlayerModel(
-      {this.playerName = "Мисливець",
-      this.level = 1,
-      this.xp = 0,
-      Map<PlayerStat, int>? initialStats,
-      Map<String, String>? initialActiveBuffs,
-      this.availableStatPoints = 0,
-      this.availableSkillPoints = 0,
-      this.baselinePhysicalPerformance,
-      this.initialSurveyCompleted = false,
-      this.playerRank = QuestDifficulty.F,
-      int? loadedCurrentHp,
-      int? loadedCurrentMp,
-      List<String>? initialLearnedSkillIds})
-      : learnedSkillIds = initialLearnedSkillIds ?? [],
+  List<Map<String, dynamic>> inventory;
+
+  PlayerModel({
+    this.playerName = "Мисливець",
+    this.level = 1,
+    this.xp = 0,
+    Map<PlayerStat, int>? initialStats,
+    Map<String, String>? initialActiveBuffs,
+    this.availableStatPoints = 0,
+    this.availableSkillPoints = 0,
+    this.baselinePhysicalPerformance,
+    this.initialSurveyCompleted = false,
+    this.playerRank = QuestDifficulty.F,
+    int? loadedCurrentHp,
+    int? loadedCurrentMp,
+    List<String>? initialLearnedSkillIds,
+    List<Map<String, dynamic>>? initialInventory,
+  })  : learnedSkillIds = initialLearnedSkillIds ?? [],
         activeBuffs = initialActiveBuffs ?? {},
+        inventory = initialInventory ?? [],
         stats = initialStats ??
             {
               PlayerStat.strength: 5,
@@ -152,7 +156,6 @@ class PlayerModel {
     }
   }
 
-  // Конвертація в JSON
   Map<String, dynamic> toJson() {
     return {
       'playerName': playerName,
@@ -168,6 +171,7 @@ class PlayerModel {
       ),
       'initialSurveyCompleted': initialSurveyCompleted,
       'activeBuffs': activeBuffs,
+      'inventory': inventory,
       'playerRank': playerRank.name,
       'maxHp': maxHp,
       'currentHp': currentHp,
@@ -223,6 +227,9 @@ class PlayerModel {
           (json['learnedSkillIds'] as List<dynamic>?)?.cast<String>() ?? [],
       initialActiveBuffs: (json['activeBuffs'] as Map<String, dynamic>?)
           ?.cast<String, String>(),
+      initialInventory: (json['inventory'] as List<dynamic>?)
+          ?.map((item) => Map<String, dynamic>.from(item))
+          .toList(),
       initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       playerRank: json['playerRank'] != null &&
               (json['playerRank'] as String).isNotEmpty

@@ -1,5 +1,6 @@
 // lib/screens/quests_screen.dart
 import 'package:awakening/models/player_model.dart';
+import 'package:awakening/providers/item_provider.dart';
 import 'package:awakening/providers/system_log_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -164,10 +165,13 @@ class _QuestsScreenState extends State<QuestsScreen>
     );
     final slog = context.read<SystemLogProvider>();
 
+    final itemProvider = context.read<ItemProvider>();
+
     QuestModel? generatedQuest = await questProvider.fetchAndAddGeneratedQuest(
         playerProvider: playerProvider,
         targetStat: targetStat, // Якщо буде вибір
-        slog: slog
+        slog: slog,
+        itemProvider: itemProvider
         // customInstruction: customInstruction?.isNotEmpty == true ? customInstruction : null,
         );
 

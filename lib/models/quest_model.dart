@@ -26,6 +26,7 @@ class QuestModel {
   final DateTime? createdAt; // Коли квест було створено/додано
   DateTime? completedAt; // Коли квест було виконано
   final int? hpCostOnCompletion;
+  List<Map<String, dynamic>>? itemRewards; // Нагороди у вигляді предметів
 
   QuestModel({
     String? id, // Дозволяємо передавати id або генеруємо
@@ -39,6 +40,7 @@ class QuestModel {
     DateTime? createdAt,
     this.completedAt,
     this.hpCostOnCompletion,
+    this.itemRewards,
   })  : id = id ?? const Uuid().v4(), // Генеруємо унікальний ID, якщо не надано
         createdAt = createdAt ?? DateTime.now();
 
@@ -79,6 +81,7 @@ class QuestModel {
       'createdAt': createdAt?.toIso8601String(), // Зберігаємо як ISO рядок
       'completedAt': completedAt?.toIso8601String(),
       'hpCostOnCompletion': hpCostOnCompletion,
+      'itemRewards': itemRewards,
     };
   }
 
@@ -104,6 +107,9 @@ class QuestModel {
           ? DateTime.parse(json['completedAt'] as String)
           : null,
       hpCostOnCompletion: json['hpCostOnCompletion'] as int?,
+      itemRewards: (json['itemRewards'] as List<dynamic>?)
+          ?.map((item) => item as Map<String, dynamic>)
+          .toList(),
     );
   }
 }
