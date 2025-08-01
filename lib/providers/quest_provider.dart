@@ -5,6 +5,7 @@ import '../models/quest_model.dart';
 import '../models/player_model.dart';
 import 'player_provider.dart';
 import 'system_log_provider.dart';
+import 'item_provider.dart';
 import '../services/gemini_quest_service.dart';
 import '../models/system_message_model.dart';
 import '../services/cloud_logger_service.dart';
@@ -17,7 +18,9 @@ class QuestProvider with ChangeNotifier {
   bool _isGeneratingQuest = false;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   PlayerProvider? _playerProvider;
+  ItemProvider? _itemProvider;
 
   final CloudLoggerService _logger = CloudLoggerService();
 
@@ -31,11 +34,12 @@ class QuestProvider with ChangeNotifier {
 
   QuestProvider();
 
-  void update(PlayerProvider? playerProvider) {
+  void update(PlayerProvider? playerProvider, ItemProvider? itemProvider) {
     if (playerProvider != null &&
         _playerProvider != playerProvider &&
         !playerProvider.isLoading) {
       _playerProvider = playerProvider;
+      _itemProvider = itemProvider;
       _loadQuests();
     } else if (playerProvider == null) {
       _activeQuests.clear();
@@ -416,6 +420,7 @@ class QuestProvider with ChangeNotifier {
   Future<QuestModel?> fetchAndAddGeneratedQuest({
     required PlayerProvider playerProvider,
     required SystemLogProvider slog,
+    required ItemProvider itemProvider,
     QuestType questType = QuestType.generated,
     PlayerStat? targetStat,
     String? customInstruction,
@@ -425,11 +430,14 @@ class QuestProvider with ChangeNotifier {
     _isGeneratingQuest = true;
     notifyListeners();
 
+    final List<String> availableItemIds = itemProvider.allItemIds;
+
     QuestModel? newQuest = await _geminiService.generateQuest(
       player: playerProvider.player,
       questType: questType,
       targetStat: targetStat,
       customPromptInstruction: customInstruction,
+      availableItemIds: availableItemIds,
     );
 
     if (newQuest != null) {

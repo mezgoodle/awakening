@@ -35,9 +35,10 @@ class GeminiQuestService {
 
   Future<QuestModel?> generateQuest({
     required PlayerModel player,
-    QuestType questType = QuestType.generated, // Тип квесту за замовчуванням
-    PlayerStat? targetStat, // Можлива фокусна характеристика
-    String? customPromptInstruction, // Додаткова інструкція для промпту
+    QuestType questType = QuestType.generated,
+    PlayerStat? targetStat,
+    String? customPromptInstruction,
+    List<String> availableItemIds = const [],
   }) async {
     final playerName =
         player.playerName == "Мисливець" ? "гравець" : player.playerName;
@@ -108,6 +109,24 @@ class GeminiQuestService {
 """;
     }
 
+    String itemRewardsInstruction = "";
+    if (availableItemIds.isNotEmpty) {
+      // Перетворюємо список ID в рядок для промпту
+      final itemIdsString = availableItemIds.join(', ');
+
+      itemRewardsInstruction = """
+
+Додаткова інструкція щодо нагород-предметів:
+Для деяких квестів (приблизно 15-20% випадків), особливо складних, ти можеш додати нагороду у вигляді предмету.
+Якщо додаєш предмет, включи в JSON відповідь поле:
+"itemRewards": [ { "itemId": "string", "quantity": integer } ]
+ВАЖЛИВО: Значення для "itemId" має бути ОБОВ'ЯЗКОВО обрано з наступного списку валідних ID: [$itemIdsString].
+Не вигадуй власні itemId.
+Приклад: "itemRewards": [ { "itemId": "${availableItemIds.first}", "quantity": 1 } ]
+Якщо нагороди у вигляді предметів немає, не додавай це поле або встанови null.
+""";
+    }
+
     final prompt = """
 Згенеруй ігрове завдання для рольової гри на Android в стилі аніме "Solo Leveling" (Підняття рівня наодинці).
 Завдання має бути реалістичним для виконання в реальному житті, але описане в термінах ігрового світу.
@@ -143,13 +162,7 @@ $hpCostInstruction
     Якщо є фокусна характеристика (targetStat) і її значення у гравця високе, XP може бути трохи більшим для відповідного рангу. Якщо низьке - трохи меншим.
 5.  Фокусна характеристика (опціонально, але ОБОВ'ЯЗКОВО якщо передано targetStat для генерації): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив. Має збігатися з переданим targetStat, якщо він був.
 
-Додаткова інструкція щодо нагород-предметів:
-Для деяких квестів (приблизно 15-20% випадків), особливо якщо вони складні або унікальні, ти можеш додати нагороду у вигляді предмету.
-Якщо додаєш предмет, включи в JSON відповідь поле:
-"itemRewards": [ { "itemId": "string", "quantity": integer } ]
-Можливі itemId: "${InventoryItem.smallHealthPotionId}".
-Приклад: "itemRewards": [ { "itemId": "${InventoryItem.smallHealthPotionId}", "quantity": 1 } ]
-Якщо нагороди у вигляді предметів немає, не додавай це поле або встанови null.
+$itemRewardsInstruction
 
 Надай відповідь ТІЛЬКИ у форматі JSON об'єкту з такими полями (використовуй подвійні лапки для ключів та рядкових значень):
 "title": "string",
@@ -323,9 +336,21 @@ $hpCostInstruction
       List<Map<String, dynamic>>? itemRewards;
       if (jsonResponse['itemRewards'] != null &&
           jsonResponse['itemRewards'] is List) {
-        itemRewards = (jsonResponse['itemRewards'] as List<dynamic>)
-            .map((item) => item as Map<String, dynamic>)
-            .toList();
+        final rawRewards = (jsonResponse['itemRewards'] as List<dynamic>);
+        itemRewards = [];
+        for (var itemData in rawRewards) {
+          if (itemData is Map<String, dynamic> &&
+              itemData['itemId'] != null &&
+              availableItemIds.contains(itemData['itemId'])) {
+            // <--- ВАЛІДАЦІЯ
+            // Додаємо тільки ті предмети, ID яких є в нашому списку
+            itemRewards.add(itemData);
+          } else {
+            print(
+                "Warning: Gemini returned an invalid or non-existent itemId: ${itemData['itemId']}. Skipping.");
+          }
+        }
+        if (itemRewards.isEmpty) itemRewards = null;
       }
 
       int? hpCost = jsonResponse['hpCostOnCompletion'] as int?;

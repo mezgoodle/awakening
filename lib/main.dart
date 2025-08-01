@@ -58,13 +58,13 @@ Future<void> main() async {
           },
         ),
 
-        // QuestProvider залежить від PlayerProvider.
-        ChangeNotifierProxyProvider<PlayerProvider, QuestProvider>(
+        // QuestProvider залежить від PlayerProvider та ItemProvider.
+        ChangeNotifierProxyProvider2<PlayerProvider, ItemProvider,
+            QuestProvider>(
           create: (context) => QuestProvider(),
-          update: (context, playerProvider, previousQuestProvider) {
-            // Оновлюємо QuestProvider, передаючи йому PlayerProvider.
-            // Це запустить _loadQuests, як тільки гравець увійде.
-            previousQuestProvider!.update(playerProvider);
+          update:
+              (context, playerProvider, itemProvider, previousQuestProvider) {
+            previousQuestProvider!.update(playerProvider, itemProvider);
             return previousQuestProvider;
           },
         ),

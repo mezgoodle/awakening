@@ -14,6 +14,8 @@ class ItemProvider with ChangeNotifier {
   Map<String, InventoryItem> get itemDictionary => _itemDictionary;
   bool get isLoading => _isLoading;
 
+  List<String> get allItemIds => _itemDictionary.keys.toList();
+
   ItemProvider() {
     _loadAllItemsFromFirestore();
   }

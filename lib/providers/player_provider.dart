@@ -573,16 +573,20 @@ class PlayerProvider with ChangeNotifier {
           "Запит на Випробування на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг...",
           MessageType.info);
 
-      // Зверни увагу, що fetchAndAddGeneratedQuest також має бути асинхронним
-      // і, можливо, йому теж потрібен доступ до Firestore, якщо квести будуть там зберігатися.
-      // Поки що він працює з SharedPreferences для квестів.
-      await questProvider.fetchAndAddGeneratedQuest(
-          playerProvider: playerProvider,
-          slog: slog,
-          questType: QuestType.rankUpChallenge,
-          customInstruction:
-              "Це дуже важливе Рангове Випробування для гравця ${playerProvider.player.playerName} (Рівень: ${playerProvider.player.level}, Поточний Ранг: ${QuestModel.getQuestDifficultyName(currentRank)}) для переходу на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
-      return true;
+      if (_itemProvider != null) {
+        await questProvider.fetchAndAddGeneratedQuest(
+            playerProvider: playerProvider,
+            itemProvider: _itemProvider!,
+            slog: slog,
+            questType: QuestType.rankUpChallenge,
+            customInstruction:
+                "Це дуже важливе Рангове Випробування для гравця ${playerProvider.player.playerName} (Рівень: ${playerProvider.player.level}, Поточний Ранг: ${QuestModel.getQuestDifficultyName(currentRank)}) для переходу на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
+        return true;
+      } else {
+        slog.addMessage("ItemProvider недоступний для створення квесту.",
+            MessageType.error);
+        return false;
+      }
     } else if (hasActiveRankUpQuest) {
       slog.addMessage(
           "У вас вже є активне Рангове Випробування!", MessageType.info);
