@@ -11,10 +11,16 @@ class InventoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final playerProvider = context.watch<PlayerProvider>();
-    final itemProvider = context.read<ItemProvider>();
+    final itemProvider = context.watch<ItemProvider>();
     final slog = context.read<SystemLogProvider>();
 
-    // Конвертуємо дані з інвентарю гравця в повноцінні об'єкти InventoryItem
+    if (playerProvider.isLoading || itemProvider.isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Інвентар')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final List<InventoryItem> inventoryItems = playerProvider.player.inventory
         .map((itemData) =>
             InventoryItem.fromJson(itemData, itemProvider.itemDictionary))
