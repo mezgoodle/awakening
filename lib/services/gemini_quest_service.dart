@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:awakening/models/inventory_item_model.dart';
 import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
