@@ -100,6 +100,19 @@ class QuestCard extends StatelessWidget {
                               ?.copyWith(fontWeight: FontWeight.bold)),
                       Text('XP: ${quest.xpReward}',
                           style: theme.textTheme.bodyMedium),
+                      if (quest.itemRewards != null) ...[
+                        const SizedBox(height: 8),
+                        Text('Предмети:',
+                            style: theme.textTheme.bodyLarge
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: quest.itemRewards!.map((item) {
+                            return Text('${item["name"]}',
+                                style: theme.textTheme.bodyMedium);
+                          }).toList(),
+                        ),
+                      ],
                       if (quest.targetStat != null) ...[
                         const SizedBox(height: 8),
                         Text(
