@@ -619,10 +619,13 @@ class PlayerProvider with ChangeNotifier {
         (item) => item['itemId'] == itemId && templateItem.isStackable);
 
     if (existingItemIndex != -1) {
-      // Якщо є, збільшуємо кількість
-      _player!.inventory[existingItemIndex]['quantity'] += quantity;
+      final existingItemData = _player!.inventory[existingItemIndex];
+      final newQuantity = (existingItemData['quantity'] as int) + quantity;
+      _player!.inventory[existingItemIndex] = {
+        'itemId': itemId,
+        'quantity': newQuantity
+      };
     } else {
-      // Якщо немає, додаємо новий запис
       _player!.inventory.add({'itemId': itemId, 'quantity': quantity});
     }
 
@@ -637,13 +640,12 @@ class PlayerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Метод для використання предмету
   void useItem(String itemId, SystemLogProvider slog) {
     if (_player == null || _itemProvider == null) return;
 
     final itemIndex =
         _player!.inventory.indexWhere((item) => item['itemId'] == itemId);
-    if (itemIndex == -1) return; // Предмета немає
+    if (itemIndex == -1) return;
 
     final templateItem = _itemProvider!.getItemById(itemId);
     if (templateItem == null) return;
@@ -670,10 +672,16 @@ class PlayerProvider with ChangeNotifier {
 
     // Якщо предмет був використаний (витратний матеріал), зменшуємо кількість
     if (itemUsed && templateItem.type == ItemType.potion) {
-      _player!.inventory[itemIndex]['quantity'] -= 1;
-      // Якщо кількість стала 0, видаляємо предмет з інвентарю
-      if (_player!.inventory[itemIndex]['quantity'] <= 0) {
+      final itemData = _player!.inventory[itemIndex];
+      final newQuantity = (itemData['quantity'] as int) - 1;
+
+      if (newQuantity <= 0) {
         _player!.inventory.removeAt(itemIndex);
+      } else {
+        _player!.inventory[itemIndex] = {
+          'itemId': itemId,
+          'quantity': newQuantity
+        };
       }
     }
 

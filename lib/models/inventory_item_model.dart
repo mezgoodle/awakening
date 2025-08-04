@@ -23,7 +23,7 @@ class InventoryItem {
   final ItemType type;
   final String iconPath;
   final bool isStackable;
-  int quantity;
+  final int quantity;
 
   final Map<ItemEffectType, double> effects;
 
@@ -34,7 +34,7 @@ class InventoryItem {
     required this.type,
     required this.iconPath,
     this.isStackable = true,
-    this.quantity = 1,
+    required this.quantity,
     this.effects = const {},
   });
 
@@ -49,6 +49,14 @@ class InventoryItem {
       quantity: quantity ?? this.quantity,
       effects: effects,
     );
+  }
+
+  InventoryItem addQuantity(int amount) =>
+      copyWith(quantity: quantity + amount);
+
+  InventoryItem removeQuantity(int amount) {
+    final newQuantity = quantity - amount;
+    return copyWith(quantity: newQuantity < 0 ? 0 : newQuantity);
   }
 
   Map<String, dynamic> toJson() {
