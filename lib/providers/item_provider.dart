@@ -43,6 +43,7 @@ class ItemProvider with ChangeNotifier {
           type: ItemType.values.byName(data['type'] as String),
           iconPath: data['iconPath'] as String,
           isStackable: data['isStackable'] as bool,
+          quantity: data['quantity'] as int,
           effects: effects ?? {},
         );
         loadedItems[itemId] = item;
