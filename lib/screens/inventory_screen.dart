@@ -35,10 +35,10 @@ class InventoryScreen extends StatelessWidget {
           : GridView.builder(
               padding: const EdgeInsets.all(12.0),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4, // 4 предмети в ряд
+                crossAxisCount: 4,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
-                childAspectRatio: 0.8, // Співвідношення сторін комірки
+                childAspectRatio: 0.8,
               ),
               itemCount: inventoryItems.length,
               itemBuilder: (context, index) {
