@@ -65,13 +65,17 @@ class InventoryItem {
 
     final templateItem = itemDictionary[itemId];
 
+    const unknownItemName = 'Невідомий Предмет';
+    const unknownItemDescription = 'Опис відсутній';
+    const unknownItemIcon = 'assets/icons/items/unknown.svg';
+
     if (templateItem == null) {
       return InventoryItem(
         itemId: itemId,
-        name: 'Невідомий Предмет',
-        description: 'Опис відсутній',
+        name: unknownItemName,
+        description: unknownItemDescription,
         type: ItemType.collectible,
-        iconPath: 'assets/icons/items/unknown.svg',
+        iconPath: unknownItemIcon,
         quantity: quantity,
       );
     }
