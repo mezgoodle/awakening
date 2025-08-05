@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'dart:async';
 
+import 'package:awakening/models/inventory_item_model.dart';
 import 'package:awakening/models/system_message_model.dart';
+import 'package:awakening/providers/item_provider.dart';
 import 'package:awakening/providers/quest_provider.dart';
 import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -35,6 +37,8 @@ class PlayerProvider with ChangeNotifier {
 
   SkillProvider? _skillProvider;
 
+  ItemProvider? _itemProvider;
+
   PlayerModel get player {
     _player ??= PlayerModel();
     return _player!;
@@ -53,8 +57,8 @@ class PlayerProvider with ChangeNotifier {
     return false;
   }
 
-  PlayerProvider(
-      this._auth, SkillProvider? skillProvider, PlayerModel? initialPlayer) {
+  PlayerProvider(this._auth, SkillProvider? skillProvider, this._itemProvider,
+      PlayerModel? initialPlayer) {
     _skillProvider = skillProvider;
     _player = initialPlayer;
     _uid = _auth?.currentUser?.uid;
@@ -65,9 +69,14 @@ class PlayerProvider with ChangeNotifier {
     }
   }
 
-  void update(FirebaseAuth? auth, SkillProvider? skillProvider,
-      PlayerModel? newPlayer) {
+  void update(
+    FirebaseAuth? auth,
+    SkillProvider? skillProvider,
+    ItemProvider? itemProvider,
+    PlayerModel? newPlayer,
+  ) {
     _skillProvider = skillProvider;
+    _itemProvider = itemProvider;
     if (auth?.currentUser?.uid != _uid) {
       _uid = auth?.currentUser?.uid;
       if (_uid != null) {
@@ -564,16 +573,20 @@ class PlayerProvider with ChangeNotifier {
           "Запит на Випробування на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг...",
           MessageType.info);
 
-      // Зверни увагу, що fetchAndAddGeneratedQuest також має бути асинхронним
-      // і, можливо, йому теж потрібен доступ до Firestore, якщо квести будуть там зберігатися.
-      // Поки що він працює з SharedPreferences для квестів.
-      await questProvider.fetchAndAddGeneratedQuest(
-          playerProvider: playerProvider,
-          slog: slog,
-          questType: QuestType.rankUpChallenge,
-          customInstruction:
-              "Це дуже важливе Рангове Випробування для гравця ${playerProvider.player.playerName} (Рівень: ${playerProvider.player.level}, Поточний Ранг: ${QuestModel.getQuestDifficultyName(currentRank)}) для переходу на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
-      return true;
+      if (_itemProvider != null) {
+        await questProvider.fetchAndAddGeneratedQuest(
+            playerProvider: playerProvider,
+            itemProvider: _itemProvider!,
+            slog: slog,
+            questType: QuestType.rankUpChallenge,
+            customInstruction:
+                "Це дуже важливе Рангове Випробування для гравця ${playerProvider.player.playerName} (Рівень: ${playerProvider.player.level}, Поточний Ранг: ${QuestModel.getQuestDifficultyName(currentRank)}) для переходу на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
+        return true;
+      } else {
+        slog.addMessage("ItemProvider недоступний для створення квесту.",
+            MessageType.error);
+        return false;
+      }
     } else if (hasActiveRankUpQuest) {
       slog.addMessage(
           "У вас вже є активне Рангове Випробування!", MessageType.info);
@@ -585,7 +598,94 @@ class PlayerProvider with ChangeNotifier {
     return false;
   }
 
-  // Метод _checkForAvailableRankUpChallenge (якщо він був і потрібен)
-  // Тепер він не потрібен, бо логіка перевірки винесена в requestRankUpChallenge
-  // та в UI для відображення кнопки.
+  void addItemToInventory(String itemId, int quantity) {
+    if (_player == null || _itemProvider == null) return;
+
+    final templateItem = _itemProvider!.getItemById(itemId);
+    if (templateItem == null) {
+      _logger.writeLog(
+        message: "Attempted to add non-existent item: $itemId",
+        severity: CloudLogSeverity.warning,
+        payload: {
+          "message": "Attempted to add non-existent item",
+          "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
+        },
+      );
+      return;
+    }
+
+    // Шукаємо, чи є вже такий предмет в інвентарі (якщо він stackable)
+    final existingItemIndex = _player!.inventory.indexWhere(
+        (item) => item['itemId'] == itemId && templateItem.isStackable);
+
+    if (existingItemIndex != -1) {
+      final existingItemData = _player!.inventory[existingItemIndex];
+      final newQuantity = (existingItemData['quantity'] as int) + quantity;
+      _player!.inventory[existingItemIndex] = {
+        'itemId': itemId,
+        'quantity': newQuantity
+      };
+    } else {
+      _player!.inventory.add({'itemId': itemId, 'quantity': quantity});
+    }
+
+    _logger.writeLog(
+      message: "Added $quantity x $itemId to inventory for player $_uid.",
+      payload: {
+        "message": "Item added to inventory",
+        "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
+      },
+    );
+    _savePlayerData();
+    notifyListeners();
+  }
+
+  void useItem(String itemId, SystemLogProvider slog) {
+    if (_player == null || _itemProvider == null) return;
+
+    final itemIndex =
+        _player!.inventory.indexWhere((item) => item['itemId'] == itemId);
+    if (itemIndex == -1) return;
+
+    final templateItem = _itemProvider!.getItemById(itemId);
+    if (templateItem == null) return;
+
+    // Застосовуємо ефекти
+    bool itemUsed = false;
+    templateItem.effects.forEach((effect, value) {
+      switch (effect) {
+        case ItemEffectType.restoreHp:
+          restorePlayerHp(value.toInt());
+          itemUsed = true;
+          slog.addMessage("Відновлено ${value.toInt()} HP.", MessageType.info);
+          break;
+        case ItemEffectType.restoreMp:
+          restorePlayerMp(value.toInt());
+          itemUsed = true;
+          slog.addMessage("Відновлено ${value.toInt()} MP.", MessageType.info);
+          break;
+        // ... інші ефекти
+        default:
+          break;
+      }
+    });
+
+    // Якщо предмет був використаний (витратний матеріал), зменшуємо кількість
+    if (itemUsed && templateItem.type == ItemType.potion) {
+      final itemData = _player!.inventory[itemIndex];
+      final newQuantity = (itemData['quantity'] as int) - 1;
+
+      if (newQuantity <= 0) {
+        _player!.inventory.removeAt(itemIndex);
+      } else {
+        _player!.inventory[itemIndex] = {
+          'itemId': itemId,
+          'quantity': newQuantity
+        };
+      }
+    }
+
+    _savePlayerData();
+    notifyListeners();
+  }
 }
