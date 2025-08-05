@@ -352,8 +352,19 @@ class QuestProvider with ChangeNotifier {
               await addQuest(generatedQuest, slog, showSnackbar: false);
             }
           } else {
-            print(
-                "Gemini failed to generate daily quest for ${stat.name}, using fallback.");
+            _logger.writeLog(
+              message:
+                  "Gemini failed to generate daily quest for ${stat.name}, using fallback.",
+              severity: CloudLogSeverity.error,
+              payload: {
+                "message": "Gemini quest generation fallback",
+                "context": {
+                  "stat": stat.name,
+                  "userId": _playerProvider?.getUserId()
+                }
+              },
+            );
+
             final fallbackQuest =
                 _getFallbackDailyQuestForStat(stat, currentPlayer);
             if (!_activeQuests.any((q) => q.title == fallbackQuest.title)) {
@@ -379,10 +390,25 @@ class QuestProvider with ChangeNotifier {
       await _playerDocRef!.set(
           {_lastDailyQuestGenerationKey: date.toIso8601String()},
           SetOptions(merge: true));
-      print(
-          "Daily quest generation date updated in Firestore to ${date.toIso8601String()}.");
+      _logger.writeLog(
+          message:
+              "Daily quest generation date updated to ${date.toIso8601String()}",
+          payload: {
+            "message": "Daily quest generation date updated",
+            "context": {"userId": _playerProvider?.getUserId(), "date": date}
+          });
     } catch (e) {
-      print("Error updating daily quest generation date: $e");
+      _logger.writeLog(
+        message: "Error updating daily quest generation date: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Daily quest generation date update error",
+          "context": {
+            "userId": _playerProvider?.getUserId(),
+            "error": e.toString()
+          }
+        },
+      );
     }
   }
 
