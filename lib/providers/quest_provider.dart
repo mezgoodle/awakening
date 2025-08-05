@@ -271,7 +271,6 @@ class QuestProvider with ChangeNotifier {
       PlayerProvider playerProvider, SystemLogProvider slog) async {
     if (_playerDocRef == null) return;
 
-    // 1. Отримуємо дату останньої генерації з документа гравця в Firestore
     String? lastGenerationDateStr;
     try {
       final playerDoc = await _playerDocRef!.get();
@@ -295,110 +294,121 @@ class QuestProvider with ChangeNotifier {
     bool shouldGenerate = true;
     if (lastGenerationDateStr != null) {
       final lastGenerationDate = DateTime.parse(lastGenerationDateStr);
-      if (lastGenerationDate == todayDateOnly) {
+      if (lastGenerationDate.isAtSameMomentAs(todayDateOnly)) {
         shouldGenerate = false;
       }
     }
 
     if (shouldGenerate) {
-      if (playerProvider.isLoading) {
+      if (playerProvider.isLoading || (_itemProvider?.isLoading ?? true)) {
         return;
       }
-      // Видалення старих невиконаних щоденних квестів з UI та БД
-      final oldDailies =
-          _activeQuests.where((q) => q.type == QuestType.daily).toList();
-      _activeQuests.removeWhere((q) => q.type == QuestType.daily);
-      if (oldDailies.isNotEmpty) {
-        WriteBatch batch = _firestore.batch();
-        for (var quest in oldDailies) {
-          batch.delete(_questsCollectionRef!.doc(quest.id));
-        }
-        await batch.commit();
-        _logger.writeLog(
-          message:
-              "Removed ${oldDailies.length} old daily quests from Firestore.",
-          payload: {
-            "message": "Old daily quests removed",
-            "context": {"userId": _playerProvider?.getUserId()}
-          },
-        );
-      }
-      notifyListeners();
 
       _isGeneratingQuest = true;
       notifyListeners();
 
+      const int maxDailyQuests = 5;
+      final existingDailyQuests =
+          _activeQuests.where((q) => q.type == QuestType.daily).toList();
+      final int questsToGenerateCount =
+          maxDailyQuests - existingDailyQuests.length;
+
+      if (questsToGenerateCount <= 0) {
+        await _updateLastGenerationDate(todayDateOnly);
+        _isGeneratingQuest = false;
+        notifyListeners();
+        return;
+      }
+
+      final Set<PlayerStat> existingQuestStats = existingDailyQuests
+          .where((q) => q.targetStat != null)
+          .map((q) => q.targetStat!)
+          .toSet();
+
+      final List<PlayerStat> neededQuestStats = PlayerStat.values
+          .where((stat) => !existingQuestStats.contains(stat))
+          .toList();
+
+      neededQuestStats.shuffle();
+
+      final statsToGenerateFor =
+          neededQuestStats.take(questsToGenerateCount).toList();
+
       PlayerModel currentPlayer = playerProvider.player;
       List<Future<void>> questGenerationFutures = [];
 
-      for (PlayerStat stat in PlayerStat.values) {
-        // Генеруємо квести паралельно
+      for (PlayerStat stat in statsToGenerateFor) {
         questGenerationFutures.add(_geminiService
             .generateQuest(
           player: currentPlayer,
           questType: QuestType.daily,
           targetStat: stat,
+          availableItemIds: _itemProvider?.allItemIds ?? [],
         )
             .then((generatedQuest) async {
-          QuestModel questToAdd;
           if (generatedQuest != null) {
-            // Перевірка, чи Gemini згенерував квест для правильного стату. Якщо ні - використовуємо fallback.
-            if (generatedQuest.targetStat == null ||
-                generatedQuest.targetStat != stat) {
-              _logger.writeLog(
-                  message:
-                      "Gemini generated daily quest for ${stat.name}, but targetStat is incorrect. Using fallback.",
-                  severity: CloudLogSeverity.warning,
-                  payload: {
-                    "message": "Gemini quest targetStat mismatch",
-                    "context": {
-                      "stat": stat.name,
-                      "questId": generatedQuest.id,
-                      "userId": _playerProvider?.getUserId()
-                    }
-                  });
-              questToAdd = _getFallbackDailyQuestForStat(stat, currentPlayer);
-            } else {
-              questToAdd = generatedQuest;
+            // Переконуємося, що квест з таким ім'ям ще не існує
+            if (!_activeQuests.any((q) => q.title == generatedQuest.title)) {
+              await addQuest(generatedQuest, slog, showSnackbar: false);
             }
           } else {
             _logger.writeLog(
-                message:
-                    "Gemini failed to generate daily quest for ${stat.name}, using fallback.",
-                severity: CloudLogSeverity.warning,
-                payload: {
-                  "message": "Gemini quest generation failed",
-                  "context": {
-                    "stat": stat.name,
-                    "userId": _playerProvider?.getUserId()
-                  }
-                });
-            questToAdd = _getFallbackDailyQuestForStat(stat, currentPlayer);
+              message:
+                  "Gemini failed to generate daily quest for ${stat.name}, using fallback.",
+              severity: CloudLogSeverity.error,
+              payload: {
+                "message": "Gemini quest generation fallback",
+                "context": {
+                  "stat": stat.name,
+                  "userId": _playerProvider?.getUserId()
+                }
+              },
+            );
+
+            final fallbackQuest =
+                _getFallbackDailyQuestForStat(stat, currentPlayer);
+            if (!_activeQuests.any((q) => q.title == fallbackQuest.title)) {
+              await addQuest(fallbackQuest, slog, showSnackbar: false);
+            }
           }
-          await addQuest(questToAdd, slog, showSnackbar: false);
         }));
       }
 
       await Future.wait(questGenerationFutures);
       slog.addMessage("Щоденні завдання оновлено.", MessageType.info);
 
-      try {
-        await _playerDocRef!.set(
-            {_lastDailyQuestGenerationKey: todayDateOnly.toIso8601String()},
-            SetOptions(merge: true));
-      } catch (e) {
-        _logger.writeLog(
-          message: "Error updating daily quest generation date: $e",
-          severity: CloudLogSeverity.error,
-          payload: {
-            "message": "Daily quest generation date update error",
-            "context": {"userId": _playerProvider?.getUserId()}
-          },
-        );
-      }
+      await _updateLastGenerationDate(todayDateOnly);
 
       _isGeneratingQuest = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _updateLastGenerationDate(DateTime date) async {
+    if (_playerDocRef == null) return;
+    try {
+      await _playerDocRef!.set(
+          {_lastDailyQuestGenerationKey: date.toIso8601String()},
+          SetOptions(merge: true));
+      _logger.writeLog(
+          message:
+              "Daily quest generation date updated to ${date.toIso8601String()}",
+          payload: {
+            "message": "Daily quest generation date updated",
+            "context": {"userId": _playerProvider?.getUserId(), "date": date}
+          });
+    } catch (e) {
+      _logger.writeLog(
+        message: "Error updating daily quest generation date: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Daily quest generation date update error",
+          "context": {
+            "userId": _playerProvider?.getUserId(),
+            "error": e.toString()
+          }
+        },
+      );
     }
   }
 
