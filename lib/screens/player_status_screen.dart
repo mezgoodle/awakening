@@ -1,4 +1,5 @@
 import 'package:awakening/providers/system_log_provider.dart';
+import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/quest_provider.dart';
@@ -198,10 +199,20 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             !questProvider.activeQuests
                 .any((q) => q.type == QuestType.rankUpChallenge);
 
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Статус Гравця'),
         actions: [
+          IconButton(
+            icon: Icon(themeProvider.themeMode == ThemeMode.dark
+                ? Icons.dark_mode
+                : Icons.light_mode),
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             tooltip: 'Журнал Системи',

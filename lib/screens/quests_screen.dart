@@ -2,6 +2,7 @@
 import 'package:awakening/models/player_model.dart';
 import 'package:awakening/providers/item_provider.dart';
 import 'package:awakening/providers/system_log_provider.dart';
+import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/quest_provider.dart';
@@ -201,6 +202,7 @@ class _QuestsScreenState extends State<QuestsScreen>
   @override
   Widget build(BuildContext context) {
     final questProvider = context.watch<QuestProvider>();
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     if (questProvider.isLoading && !questProvider.isGeneratingQuest) {
       return Scaffold(
@@ -213,6 +215,14 @@ class _QuestsScreenState extends State<QuestsScreen>
       appBar: AppBar(
         title: const Text('Завдання'),
         actions: [
+          IconButton(
+            icon: Icon(themeProvider.themeMode == ThemeMode.dark
+                ? Icons.dark_mode
+                : Icons.light_mode),
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
           IconButton(
             icon:
                 const Icon(Icons.notifications_outlined), // Іконка для журналу

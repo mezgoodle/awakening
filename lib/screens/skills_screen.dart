@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
@@ -22,6 +23,7 @@ class SkillsScreen extends StatelessWidget {
 
     final player = playerProvider.player;
     final allSkills = skillProvider.allSkills;
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     final learnedSkills =
         allSkills.where((s) => player.learnedSkillIds.contains(s.id)).toList();
@@ -41,6 +43,14 @@ class SkillsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Навички'),
         actions: [
+          IconButton(
+            icon: Icon(themeProvider.themeMode == ThemeMode.dark
+                ? Icons.dark_mode
+                : Icons.light_mode),
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: 16.0),
