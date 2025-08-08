@@ -1,3 +1,4 @@
+import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/inventory_item_model.dart';
@@ -25,10 +26,21 @@ class InventoryScreen extends StatelessWidget {
         .map((itemData) =>
             InventoryItem.fromJson(itemData, itemProvider.itemDictionary))
         .toList();
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Інвентар'),
+        actions: [
+          IconButton(
+            icon: Icon(themeProvider.themeMode == ThemeMode.dark
+                ? Icons.dark_mode
+                : Icons.light_mode),
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
+        ],
       ),
       body: inventoryItems.isEmpty
           ? const Center(child: Text('Ваш інвентар порожній.'))
