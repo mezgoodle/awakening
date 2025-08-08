@@ -10,6 +10,7 @@ import 'providers/quest_provider.dart';
 import 'providers/system_log_provider.dart';
 import 'providers/skill_provider.dart';
 import 'screens/splash_screen.dart';
+import 'package:awakening/theme/theme.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'services/cloud_logger_service.dart';
@@ -86,8 +87,6 @@ Future<void> main() async {
     ),
   );
 }
-
-import 'package:awakening/theme/theme.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

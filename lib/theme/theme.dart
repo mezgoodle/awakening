@@ -8,18 +8,16 @@ class AppTheme {
     textTheme: const TextTheme(
       bodyLarge: TextStyle(color: Colors.black),
       bodyMedium: TextStyle(color: Colors.black87),
-      titleLarge: TextStyle(
-          color: Colors.blueAccent, fontWeight: FontWeight.bold),
-      titleMedium:
-          TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
+      titleLarge:
+          TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+      titleMedium: TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
       headlineSmall: TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.bold), // для заголовків
+          color: Colors.black, fontWeight: FontWeight.bold), // для заголовків
     ),
     radioTheme: RadioThemeData(
       // Стилізація радіокнопок
-      fillColor: WidgetStateProperty.resolveWith<Color>(
-          (Set<WidgetState> states) {
+      fillColor:
+          WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
         if (states.contains(WidgetState.selected)) {
           return Colors.blueAccent;
         }
@@ -76,8 +74,8 @@ class AppTheme {
           TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
     ),
     radioTheme: RadioThemeData(
-      fillColor: WidgetStateProperty.resolveWith<Color>(
-          (Set<WidgetState> states) {
+      fillColor:
+          WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
         if (states.contains(WidgetState.selected)) {
           return Colors.lightBlueAccent;
         }
