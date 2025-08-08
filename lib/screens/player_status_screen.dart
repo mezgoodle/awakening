@@ -96,9 +96,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     );
   }
 
-  // Додамо метод для отримання кольору рангу, схожий на той, що в QuestCard
   Color _getRankColor(QuestDifficulty difficulty, BuildContext context) {
-    // Можна винести цю логіку в утиліту або в QuestModel, якщо вона використовується в багатьох місцях
     switch (difficulty) {
       case QuestDifficulty.S:
         return Colors.redAccent[700]!;
@@ -131,10 +129,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             const SizedBox(width: 8),
             Text(
               '$label: $currentValue / $maxValue',
-              style: const TextStyle(
-                  fontSize: 15,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ],
         ),

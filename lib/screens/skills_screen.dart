@@ -267,8 +267,9 @@ class _SkillCardState extends State<SkillCard> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(widget.skill.description,
-                  style: TextStyle(color: Colors.grey[300])),
+              Text(
+                widget.skill.description,
+              ),
               const SizedBox(height: 10),
               if (isBuffActive)
                 _buildTimerText('Активно:', DateTime.parse(buffEndTimeString),
@@ -324,7 +325,9 @@ class _SkillCardState extends State<SkillCard> {
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Вимоги:',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          )),
       ...reqWidgets
     ]);
   }
