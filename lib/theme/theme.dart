@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 
+class AppColors {
+  static const Color primaryBlue = Colors.blueAccent;
+  static const Color lightBackground = Color(0xFFF5F5F5);
+  static const Color lightCardBackground = Color(0xFFFFFFFF);
+  static const Color lightAppBarBackground = Color(0xFFE0E0E0);
+}
+
 class AppTheme {
   static final ThemeData lightTheme = ThemeData(
     primarySwatch: Colors.blue,
     brightness: Brightness.light,
-    scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+    scaffoldBackgroundColor: AppColors.lightBackground,
     textTheme: const TextTheme(
       bodyLarge: TextStyle(color: Colors.black),
       bodyMedium: TextStyle(color: Colors.black87),
       titleLarge:
-          TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+          TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
       titleMedium: TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
       headlineSmall: TextStyle(
           color: Colors.black, fontWeight: FontWeight.bold), // для заголовків
@@ -19,20 +26,20 @@ class AppTheme {
       fillColor:
           WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
         if (states.contains(WidgetState.selected)) {
-          return Colors.blueAccent;
+          return AppColors.primaryBlue;
         }
         return Colors.grey[400]!;
       }),
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: Colors.blueAccent,
+      color: AppColors.primaryBlue,
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFFE0E0E0),
+      backgroundColor: AppColors.lightAppBarBackground,
       foregroundColor: Colors.black,
     ),
     cardTheme: CardTheme(
-      color: const Color(0xFFFFFFFF),
+      color: AppColors.lightCardBackground,
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8.0),
@@ -41,7 +48,7 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: AppColors.primaryBlue,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -49,11 +56,11 @@ class AppTheme {
     ),
     textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-            foregroundColor: Colors.blueAccent,
+            foregroundColor: AppColors.primaryBlue,
             textStyle: const TextStyle(fontWeight: FontWeight.w600))),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
-      backgroundColor: const Color(0xFFE0E0E0),
-      selectedItemColor: Colors.blueAccent,
+      backgroundColor: AppColors.lightAppBarBackground,
+      selectedItemColor: AppColors.primaryBlue,
       unselectedItemColor: Colors.grey[600],
       selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
     ),

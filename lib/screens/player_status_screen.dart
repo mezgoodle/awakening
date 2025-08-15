@@ -195,7 +195,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 .any((q) => q.type == QuestType.rankUpChallenge);
 
     final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Статус Гравця'),
