@@ -1,4 +1,5 @@
 import 'package:awakening/providers/system_log_provider.dart';
+import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/quest_provider.dart';
@@ -95,9 +96,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     );
   }
 
-  // Додамо метод для отримання кольору рангу, схожий на той, що в QuestCard
   Color _getRankColor(QuestDifficulty difficulty, BuildContext context) {
-    // Можна винести цю логіку в утиліту або в QuestModel, якщо вона використовується в багатьох місцях
     switch (difficulty) {
       case QuestDifficulty.S:
         return Colors.redAccent[700]!;
@@ -130,10 +129,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             const SizedBox(width: 8),
             Text(
               '$label: $currentValue / $maxValue',
-              style: const TextStyle(
-                  fontSize: 15,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -198,10 +194,19 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             !questProvider.activeQuests
                 .any((q) => q.type == QuestType.rankUpChallenge);
 
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Статус Гравця'),
         actions: [
+          IconButton(
+            icon: Icon(themeProvider.themeMode == ThemeMode.dark
+                ? Icons.dark_mode
+                : Icons.light_mode),
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             tooltip: 'Журнал Системи',
@@ -264,8 +269,10 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               player.playerName,
               actionWidget: IconButton(
                 // Додаємо кнопку редагування
-                icon: const Icon(Icons.edit_outlined,
-                    color: Colors.white70, size: 20),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 20,
+                ),
                 tooltip: 'Редагувати ім\'я',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -276,7 +283,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             ),
             const SizedBox(height: 16),
             Card(
-              color: const Color(0xFF2A2A2A),
               elevation: 3,
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -284,7 +290,9 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: <Widget>[
                     const Text("Ранг Мисливця:",
-                        style: TextStyle(fontSize: 16, color: Colors.white70)),
+                        style: TextStyle(
+                          fontSize: 16,
+                        )),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
@@ -441,23 +449,28 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
 
   Widget _buildInfoCard(String label, String value, {Widget? actionWidget}) {
     return Card(
-      color: const Color(0xFF2A2A2A),
       elevation: 3,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
-            Text(label,
-                style: const TextStyle(fontSize: 16, color: Colors.white70)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+              ),
+            ),
             Row(
               // Об'єднуємо значення та екшн-віджет
               children: [
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 if (actionWidget != null) ...[
                   // Якщо є actionWidget
                   const SizedBox(width: 8),
