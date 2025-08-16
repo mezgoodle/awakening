@@ -36,17 +36,17 @@ class ItemProvider with ChangeNotifier {
             (key, value) =>
                 MapEntry(ItemEffectType.values.byName(key), value as double));
 
-        final item = InventoryItem(
+        final itemTemplate = InventoryItem(
           itemId: itemId,
           name: data['name'] as String,
           description: data['description'] as String,
           type: ItemType.values.byName(data['type'] as String),
           iconPath: data['iconPath'] as String,
           isStackable: data['isStackable'] as bool,
-          quantity: data['quantity'] as int,
+          quantity: 1,
           effects: effects ?? {},
         );
-        loadedItems[itemId] = item;
+        loadedItems[itemId] = itemTemplate;
       }
 
       _itemDictionary = loadedItems;
