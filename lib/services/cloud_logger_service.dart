@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:googleapis/logging/v2.dart';
 import 'package:googleapis_auth/auth_io.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, debugPrint;
 
 enum CloudLogSeverity {
   info,
@@ -94,9 +94,9 @@ class CloudLoggerService {
 
     try {
       await _loggingApi.entries.write(request);
-      print("Log sent to GCP: $message");
+      debugPrint("Log sent to GCP: $message");
     } catch (e) {
-      print("Error sending log to GCP: $e");
+      debugPrint("Error sending log to GCP: $e");
     }
   }
 }

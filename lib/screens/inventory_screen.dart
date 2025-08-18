@@ -1,4 +1,5 @@
 import 'package:awakening/providers/theme_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/inventory_item_model.dart';
@@ -46,10 +47,10 @@ class InventoryScreen extends StatelessWidget {
           ? const Center(child: Text('Ваш інвентар порожній.'))
           : GridView.builder(
               padding: const EdgeInsets.all(12.0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 120.0,
+                crossAxisSpacing: 12.0,
+                mainAxisSpacing: 12.0,
                 childAspectRatio: 0.8,
               ),
               itemCount: inventoryItems.length,
@@ -109,27 +110,75 @@ class InventorySlot extends StatelessWidget {
         );
       },
       child: Card(
-        color: Colors.white10,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            width: 0.5,
+          ),
+        ),
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            const Center(
-              // TODO: Додати іконку предмета
-              child: Icon(Icons.local_drink, size: 32, color: Colors.redAccent),
-            ),
-            Positioned(
-              bottom: 4,
-              right: 4,
-              child: Text(
-                'x${item.quantity}',
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.white),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: _buildItemIcon(item.iconPath),
               ),
             ),
+            if (item.isStackable && item.quantity > 1)
+              Positioned(
+                bottom: 5,
+                right: 5,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${item.quantity}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildItemIcon(String iconPath) {
+    if (iconPath.trim().isEmpty) {
+      return const Icon(
+        Icons.inventory_2_outlined,
+        size: 48,
+        color: Colors.grey,
+      );
+    }
+    final lower = iconPath.toLowerCase();
+    if (lower.endsWith('.svg')) {
+      return SvgPicture.asset(
+        iconPath,
+        placeholderBuilder: (context) => const Icon(Icons.inventory_2_outlined,
+            size: 32, color: Colors.grey),
+      );
+    } else {
+      return Image.asset(
+        iconPath,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.error_outline,
+              size: 32, color: Colors.redAccent);
+        },
+      );
+    }
   }
 }
