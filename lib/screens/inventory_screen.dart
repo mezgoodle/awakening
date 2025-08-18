@@ -110,11 +110,14 @@ class InventorySlot extends StatelessWidget {
         );
       },
       child: Card(
-        color: Colors.white10,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12.0),
-          side: const BorderSide(color: Colors.white24, width: 0.5),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            width: 0.5,
+          ),
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -125,7 +128,7 @@ class InventorySlot extends StatelessWidget {
                 child: _buildItemIcon(item.iconPath),
               ),
             ),
-            if (item.isStackable && item.quantity > 0)
+            if (item.isStackable && item.quantity > 1)
               Positioned(
                 bottom: 5,
                 right: 5,
@@ -153,7 +156,15 @@ class InventorySlot extends StatelessWidget {
   }
 
   Widget _buildItemIcon(String iconPath) {
-    if (iconPath.toLowerCase().endsWith('.svg')) {
+    if (iconPath.trim().isEmpty) {
+      return const Icon(
+        Icons.inventory_2_outlined,
+        size: 48,
+        color: Colors.grey,
+      );
+    }
+    final lower = iconPath.toLowerCase();
+    if (lower.endsWith('.svg')) {
       return SvgPicture.asset(
         iconPath,
         placeholderBuilder: (context) => const Icon(Icons.inventory_2_outlined,

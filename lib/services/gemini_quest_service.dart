@@ -189,6 +189,7 @@ $itemRewardsInstruction
     // print("--------------");
 
     try {
+      return null;
       final response = await _model.generateContent([Content.text(prompt)]);
 
       // print("--- RESPONSE ---");
