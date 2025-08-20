@@ -14,7 +14,7 @@ class GeminiQuestService {
   GeminiQuestService()
       : _model = GenerativeModel(
             model: modelName,
-            apiKey: dotenv.env['GEMINI_API_KEY']!,
+            apiKey: "AIzaSyCRiACcJAazjJSqmK9laQ9c1lXb4xcNiNE",
             safetySettings: [
               SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
               SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.high),
@@ -189,7 +189,6 @@ $itemRewardsInstruction
     // print("--------------");
 
     try {
-      return null;
       final response = await _model.generateContent([Content.text(prompt)]);
 
       // print("--- RESPONSE ---");
