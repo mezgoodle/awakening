@@ -14,7 +14,7 @@ class GeminiQuestService {
   GeminiQuestService()
       : _model = GenerativeModel(
             model: modelName,
-            apiKey: "AIzaSyCRiACcJAazjJSqmK9laQ9c1lXb4xcNiNE",
+            apiKey: dotenv.env['GEMINI_API_KEY']!,
             safetySettings: [
               SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
               SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.high),
