@@ -1,0 +1,26 @@
+# .github/workflows/main.yml
+name: Get Signing Report
+
+on:
+  workflow_dispatch: # Дозволяє запускати вручну
+
+jobs:
+  get-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      # Надаємо права на виконання для gradlew
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Run signingReport
+        run: ./gradlew signingReport
+        working-directory: android
