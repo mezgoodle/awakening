@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 
 // Providers
 import 'package:awakening/providers/theme_provider.dart';
+import 'package:awakening/providers/skill_provider.dart';
 
 // Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +26,11 @@ void main() async {
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      // --- 1. Basic services and providers without dependencies ---
+      Provider<FirebaseAuth>(
+        create: (_) => FirebaseAuth.instance,
+      ),
+      ChangeNotifierProvider(create: (_) => SkillProvider()),
     ],
     child: const MyApp(),
   ));
