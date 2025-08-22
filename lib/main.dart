@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 // Providers
 import 'package:awakening/providers/theme_provider.dart';
 import 'package:awakening/providers/skill_provider.dart';
+import 'package:awakening/providers/item_provider.dart';
 
 // Firebase
 import 'package:firebase_core/firebase_core.dart';
@@ -31,6 +32,7 @@ void main() async {
         create: (_) => FirebaseAuth.instance,
       ),
       ChangeNotifierProvider(create: (_) => SkillProvider()),
+      ChangeNotifierProvider(create: (_) => ItemProvider()),
     ],
     child: const MyApp(),
   ));
