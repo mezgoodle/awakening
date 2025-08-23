@@ -41,6 +41,12 @@ dependencies:
   provider: ^6.1.5+1
   shared_preferences: ^2.5.3
   uuid: ^4.5.1
+  googleapis: ^14.0.0
+  googleapis_auth: ^2.0.0
+  firebase_ai: ^3.1.0
+  intl: ^0.20.2
+  flutter_svg: ^2.2.0
+
 
 dev_dependencies:
   flutter_test:
@@ -65,7 +71,8 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
+  assets:
+      - assets/service_account.json
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
