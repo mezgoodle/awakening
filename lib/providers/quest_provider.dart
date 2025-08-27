@@ -389,25 +389,25 @@ class QuestProvider with ChangeNotifier {
       await _playerDocRef!.set(
           {_lastDailyQuestGenerationKey: date.toIso8601String()},
           SetOptions(merge: true));
-      // _logger.writeLog(
-      //     message:
-      //     "Daily quest generation date updated to ${date.toIso8601String()}",
-      //     payload: {
-      //       "message": "Daily quest generation date updated",
-      //       "context": {"userId": _playerProvider?.getUserId(), "date": date}
-      //     });
+      _logger.writeLog(
+          message:
+              "Daily quest generation date updated to ${date.toIso8601String()}",
+          payload: {
+            "message": "Daily quest generation date updated",
+            "context": {"userId": _playerProvider?.getUserId(), "date": date}
+          });
     } catch (e) {
-      // _logger.writeLog(
-      //   message: "Error updating daily quest generation date: $e",
-      //   severity: CloudLogSeverity.error,
-      //   payload: {
-      //     "message": "Daily quest generation date update error",
-      //     "context": {
-      //       "userId": _playerProvider?.getUserId(),
-      //       "error": e.toString()
-      //     }
-      //   },
-      // );
+      _logger.writeLog(
+        message: "Error updating daily quest generation date: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Daily quest generation date update error",
+          "context": {
+            "userId": _playerProvider?.getUserId(),
+            "error": e.toString()
+          }
+        },
+      );
     }
   }
 
@@ -478,25 +478,25 @@ class QuestProvider with ChangeNotifier {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      // _logger.writeLog(
-      //   message: "All quests deleted from Firestore for the user.",
-      //   payload: {
-      //     "message": "All quests reset",
-      //     "context": {"userId": _playerProvider?.getUserId()}
-      //   },
-      // );
+      _logger.writeLog(
+        message: "All quests deleted from Firestore for the user.",
+        payload: {
+          "message": "All quests reset",
+          "context": {"userId": _playerProvider?.getUserId()}
+        },
+      );
     } catch (e) {
-      // _logger.writeLog(
-      //   message: "Error deleting all quests from Firestore: $e",
-      //   severity: CloudLogSeverity.error,
-      //   payload: {
-      //     "message": "Quest reset error",
-      //     "context": {
-      //       "userId": _playerProvider?.getUserId(),
-      //       "error": e.toString()
-      //     }
-      //   },
-      // );
+      _logger.writeLog(
+        message: "Error deleting all quests from Firestore: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "message": "Quest reset error",
+          "context": {
+            "userId": _playerProvider?.getUserId(),
+            "error": e.toString()
+          }
+        },
+      );
     }
   }
 }

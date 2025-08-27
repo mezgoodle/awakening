@@ -10,8 +10,6 @@ class GeminiQuestService {
 
   static const String modelName = 'gemini-2.0-flash-001';
 
-  final model = FirebaseAI.googleAI().generativeModel(model: modelName);
-
   GeminiQuestService()
       : _model = FirebaseAI.googleAI().generativeModel(
             model: modelName,

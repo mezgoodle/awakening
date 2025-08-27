@@ -70,11 +70,11 @@ class PlayerProvider with ChangeNotifier {
   }
 
   void update(
-      FirebaseAuth? auth,
-      SkillProvider? skillProvider,
-      ItemProvider? itemProvider,
-      PlayerModel? newPlayer,
-      ) {
+    FirebaseAuth? auth,
+    SkillProvider? skillProvider,
+    ItemProvider? itemProvider,
+    PlayerModel? newPlayer,
+  ) {
     _skillProvider = skillProvider;
     _itemProvider = itemProvider;
     if (auth?.currentUser?.uid != _uid) {
@@ -128,7 +128,7 @@ class PlayerProvider with ChangeNotifier {
         _player = PlayerModel();
         _logger.writeLog(
             message:
-            "No player data in Firestore for UID $_uid, creating new player.",
+                "No player data in Firestore for UID $_uid, creating new player.",
             payload: {
               "message": "No player data found",
               "context": {
@@ -145,7 +145,7 @@ class PlayerProvider with ChangeNotifier {
     } catch (e) {
       _logger.writeLog(
           message:
-          "Error loading player data from Firestore: $e. Creating new player.",
+              "Error loading player data from Firestore: $e. Creating new player.",
           severity: CloudLogSeverity.warning);
       _player = PlayerModel();
       await _savePlayerData();
@@ -225,14 +225,14 @@ class PlayerProvider with ChangeNotifier {
     int stamina = _modifiedStats![PlayerStat.stamina] ?? 0;
     int intelligence = _modifiedStats![PlayerStat.intelligence] ?? 0;
     _modifiedMaxHp = (((_player!.level * PlayerModel.baseHpPerLevel) +
-        (stamina * PlayerModel.hpPerStaminaPoint) +
-        50) *
-        maxHpMultiplier)
+                (stamina * PlayerModel.hpPerStaminaPoint) +
+                50) *
+            maxHpMultiplier)
         .round();
     _modifiedMaxMp = (((_player!.level * PlayerModel.baseMpPerLevel) +
-        (intelligence * PlayerModel.mpPerIntelligencePoint) +
-        20) *
-        maxMpMultiplier)
+                (intelligence * PlayerModel.mpPerIntelligencePoint) +
+                20) *
+            maxMpMultiplier)
         .round();
 
     _player!.currentHp = min(_player!.currentHp, _modifiedMaxHp!);
@@ -243,7 +243,7 @@ class PlayerProvider with ChangeNotifier {
     if (_playerDocRef == null || _player == null) {
       _logger.writeLog(
         message:
-        "Player data not ready for saving yet (no UID or player model).",
+            "Player data not ready for saving yet (no UID or player model).",
         severity: CloudLogSeverity.warning,
       );
       return;
@@ -384,7 +384,7 @@ class PlayerProvider with ChangeNotifier {
     _player!.useMp(mpCost);
 
     final buffEndTime =
-    DateTime.now().add(skill.duration ?? const Duration(seconds: 0));
+        DateTime.now().add(skill.duration ?? const Duration(seconds: 0));
     _player!.activeBuffs[skillId] = buffEndTime.toIso8601String();
 
     if (skill.cooldown != null) {
@@ -536,12 +536,11 @@ class PlayerProvider with ChangeNotifier {
 
   void awardNewRank(QuestDifficulty newRank, SystemLogProvider slog) {
     if (_player!.playerRank.index < newRank.index) {
-      // Перевіряємо, чи новий ранг дійсно вищий
       _player!.playerRank = newRank;
       slog.addMessage(
           "Ранг Мисливця підвищено! Новий ранг: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
           MessageType.rankUp);
-      _savePlayerData(); // Зберігаємо зміни
+      _savePlayerData();
       notifyListeners();
       // _checkForAvailableRankUpChallenge(); // Перевіряємо, чи доступний наступний ранг-ап
     }
@@ -553,14 +552,15 @@ class PlayerProvider with ChangeNotifier {
 
     QuestDifficulty currentRank = _player!.playerRank;
     QuestDifficulty nextPotentialRankByLevel =
-    PlayerModel.calculateRankByLevel(_player!.level);
+        PlayerModel.calculateRankByLevel(_player!.level);
     bool hasActiveRankUpQuest = questProvider.activeQuests
         .any((q) => q.type == QuestType.rankUpChallenge);
 
     if (nextPotentialRankByLevel.index > currentRank.index &&
         !hasActiveRankUpQuest) {
-      QuestDifficulty targetRankForChallenge =
-      QuestDifficulty.values[currentRank.index + 1];
+      final nextIndex =
+          min(currentRank.index + 1, QuestDifficulty.values.length - 1);
+      final targetRankForChallenge = QuestDifficulty.values[nextIndex];
 
       if (targetRankForChallenge.index > nextPotentialRankByLevel.index) {
         slog.addMessage(
@@ -580,7 +580,7 @@ class PlayerProvider with ChangeNotifier {
             slog: slog,
             questType: QuestType.rankUpChallenge,
             customInstruction:
-            "Це дуже важливе Рангове Випробування для гравця ${playerProvider.player.playerName} (Рівень: ${playerProvider.player.level}, Поточний Ранг: ${QuestModel.getQuestDifficultyName(currentRank)}) для переходу на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
+                "Це дуже важливе Рангове Випробування для гравця ${playerProvider.player.playerName} (Рівень: ${playerProvider.player.level}, Поточний Ранг: ${QuestModel.getQuestDifficultyName(currentRank)}) для переходу на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
         return true;
       } else {
         slog.addMessage("ItemProvider недоступний для створення квесту.",
@@ -616,7 +616,7 @@ class PlayerProvider with ChangeNotifier {
 
     // Шукаємо, чи є вже такий предмет в інвентарі (якщо він stackable)
     final existingItemIndex = _player!.inventory.indexWhere(
-            (item) => item['itemId'] == itemId && templateItem.isStackable);
+        (item) => item['itemId'] == itemId && templateItem.isStackable);
 
     if (existingItemIndex != -1) {
       final existingItemData = _player!.inventory[existingItemIndex];
@@ -644,7 +644,7 @@ class PlayerProvider with ChangeNotifier {
     if (_player == null || _itemProvider == null) return;
 
     final itemIndex =
-    _player!.inventory.indexWhere((item) => item['itemId'] == itemId);
+        _player!.inventory.indexWhere((item) => item['itemId'] == itemId);
     if (itemIndex == -1) return;
 
     final templateItem = _itemProvider!.getItemById(itemId);
@@ -664,7 +664,7 @@ class PlayerProvider with ChangeNotifier {
           itemUsed = true;
           slog.addMessage("Відновлено ${value.toInt()} MP.", MessageType.info);
           break;
-      // ... інші ефекти
+        // ... інші ефекти
         default:
           break;
       }

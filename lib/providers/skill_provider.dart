@@ -1,4 +1,4 @@
-// import 'package:awakening/services/cloud_logger_service.dart';
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/skill_model.dart';
@@ -8,7 +8,7 @@ import 'package:collection/collection.dart';
 class SkillProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // final CloudLoggerService _logger = CloudLoggerService();
+  final CloudLoggerService _logger = CloudLoggerService();
 
   List<SkillModel> _allSkills = [];
   bool _isLoading = true;
@@ -60,18 +60,18 @@ class SkillProvider with ChangeNotifier {
           cooldown: cooldown,
         );
       }).toList();
-      // _logger.writeLog(
-      //   message: "Loaded ${_allSkills.length} skills from Firestore.",
-      //   severity: CloudLogSeverity.info,
-      // );
+      _logger.writeLog(
+        message: "Loaded ${_allSkills.length} skills from Firestore.",
+        severity: CloudLogSeverity.info,
+      );
     } catch (e) {
-      // _logger.writeLog(
-      //   message: "Error loading skills from Firestore",
-      //   severity: CloudLogSeverity.error,
-      //   payload: {
-      //     'error': e.toString(),
-      //   },
-      // );
+      _logger.writeLog(
+        message: "Error loading skills from Firestore",
+        severity: CloudLogSeverity.error,
+        payload: {
+          'error': e.toString(),
+        },
+      );
       _allSkills = [];
     }
 

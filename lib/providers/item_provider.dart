@@ -1,4 +1,4 @@
-// import 'package:awakening/services/cloud_logger_service.dart';
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:awakening/models/item_model.dart';
@@ -6,7 +6,7 @@ import 'package:awakening/models/item_model.dart';
 class ItemProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // final CloudLoggerService _logger = CloudLoggerService();
+  final CloudLoggerService _logger = CloudLoggerService();
 
   Map<String, InventoryItem> _itemDictionary = {};
   bool _isLoading = true;
@@ -33,7 +33,7 @@ class ItemProvider with ChangeNotifier {
         final itemId = data['id'] as String;
 
         final effects = (data['effects'] as Map<String, dynamic>?)?.map(
-                (key, value) =>
+            (key, value) =>
                 MapEntry(ItemEffectType.values.byName(key), value as double));
 
         final itemTemplate = InventoryItem(
@@ -50,22 +50,22 @@ class ItemProvider with ChangeNotifier {
       }
 
       _itemDictionary = loadedItems;
-      // _logger.writeLog(
-      //   message: "Loaded ${_itemDictionary.length} items from Firestore.",
-      //   payload: {
-      //     "itemCount": _itemDictionary.length,
-      //     "timestamp": DateTime.now().toIso8601String(),
-      //   },
-      // );
+      _logger.writeLog(
+        message: "Loaded ${_itemDictionary.length} items from Firestore.",
+        payload: {
+          "itemCount": _itemDictionary.length,
+          "timestamp": DateTime.now().toIso8601String(),
+        },
+      );
     } catch (e) {
-      // _logger.writeLog(
-      //   message: "Error loading items from Firestore: $e",
-      //   severity: CloudLogSeverity.error,
-      //   payload: {
-      //     "error": e.toString(),
-      //     "timestamp": DateTime.now().toIso8601String(),
-      //   },
-      // );
+      _logger.writeLog(
+        message: "Error loading items from Firestore: $e",
+        severity: CloudLogSeverity.error,
+        payload: {
+          "error": e.toString(),
+          "timestamp": DateTime.now().toIso8601String(),
+        },
+      );
       _itemDictionary = {};
     }
 
