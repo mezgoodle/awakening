@@ -34,6 +34,10 @@ void main() async {
     providers: [
       ChangeNotifierProvider(create: (_) => ThemeProvider()),
       // --- 1. Basic services and providers without dependencies ---
+      Provider<CloudLoggerService>(
+        create: (_) => CloudLoggerService(),
+        lazy: false,
+      ),
       Provider<FirebaseAuth>(
         create: (_) => FirebaseAuth.instance,
       ),

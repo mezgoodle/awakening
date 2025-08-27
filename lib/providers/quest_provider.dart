@@ -441,17 +441,16 @@ class QuestProvider with ChangeNotifier {
 
     final List<String> availableItemIds = itemProvider.allItemIds;
 
-    final newQuest = null;
-    // QuestModel? newQuest = await _geminiService.generateQuest(
-    //   player: playerProvider.player,
-    //   questType: questType,
-    //   targetStat: targetStat,
-    //   customPromptInstruction: customInstruction,
-    //   availableItemIds: availableItemIds,
-    // );
+    QuestModel? newQuest = await _geminiService.generateQuest(
+      player: playerProvider.player,
+      questType: questType,
+      targetStat: targetStat,
+      customPromptInstruction: customInstruction,
+      availableItemIds: availableItemIds,
+    );
 
     if (newQuest != null) {
-      await addQuest(newQuest, slog); // Тепер викликаємо асинхронний метод
+      await addQuest(newQuest, slog);
     } else {
       _logger.writeLog(
         message: "Failed to generate a new quest using Gemini API.",
