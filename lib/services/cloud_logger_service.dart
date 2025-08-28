@@ -90,8 +90,6 @@ class CloudLoggerService {
         return 'ERROR';
       case CloudLogSeverity.debug:
         return 'DEBUG';
-      default:
-        return 'UNKNOWN';
     }
   }
 
