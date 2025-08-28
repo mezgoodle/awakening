@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, debugPrint, kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:googleapis/logging/v2.dart';
 import 'package:googleapis_auth/auth_io.dart';
@@ -33,7 +34,8 @@ class CloudLoggerService {
 
   Future<void> _initialize() async {
     try {
-      final jsonString = await rootBundle.loadString('assets/service_account.json');
+      final jsonString =
+          await rootBundle.loadString('assets/service_account.json');
       final credentialsJson = jsonDecode(jsonString);
       _projectId = credentialsJson['project_id'];
       final credentials = ServiceAccountCredentials.fromJson(credentialsJson);
@@ -41,13 +43,14 @@ class CloudLoggerService {
       final client = await clientViaServiceAccount(credentials, scopes);
       _loggingApi = LoggingApi(client);
       _isInitialized = true;
-      print("CloudLoggerService Initialized Successfully (via Service Account). Project ID: $_projectId");
+      print(
+          "CloudLoggerService Initialized Successfully (via Service Account). Project ID: $_projectId");
 
-      // Get device and package info
       await _getDeviceAndPackageInfo();
     } catch (e) {
       print("!!! FATAL ERROR INITIALIZING CloudLoggerService: $e");
-      print("!!! Logging to GCP will not work. Check 'assets/service_account.json'.");
+      print(
+          "!!! Logging to GCP will not work. Check 'assets/service_account.json'.");
       _isInitialized = false;
     }
   }
@@ -109,7 +112,6 @@ class CloudLoggerService {
     final fullLogName = 'projects/$_projectId/logs/$logName';
     final platform = defaultTargetPlatform.toString().split('.').last;
 
-    // Create the base payload with our context
     final Map<String, dynamic> globalContext = {
       'message': message,
       'app': {
@@ -123,7 +125,6 @@ class CloudLoggerService {
       'sessionId': _sessionId,
     };
 
-    // Merge the specific payload with the global context
     final finalPayload = Map<String, dynamic>.from(globalContext);
     if (payload != null) {
       finalPayload['context'] = payload;

@@ -115,17 +115,30 @@ class PlayerProvider with ChangeNotifier {
         _logger.writeLog(
             message: "Player data for UID $_uid loaded from Firestore.",
             payload: {
-              'action': 'load_player_data',
-              'uid': _uid,
-              'player': _player!.toJson(),
+              "message": "Player data loaded",
+              "context": {
+                "user": {
+                  "playerName": _player!.playerName,
+                  "level": _player!.level,
+                  "xp": _player!.xp,
+                }
+              }
             });
       } else {
         _player = PlayerModel();
         _logger.writeLog(
-            message: "No player data in Firestore for UID $_uid, creating new player.",
+            message:
+                "No player data in Firestore for UID $_uid, creating new player.",
             payload: {
-              'action': 'create_new_player',
-              'uid': _uid,
+              "message": "No player data found",
+              "context": {
+                "id": _uid,
+                "user": {
+                  "playerName": _player!.playerName,
+                  "level": _player!.level,
+                  "xp": _player!.xp,
+                }
+              }
             });
         await _savePlayerData();
       }
@@ -240,8 +253,15 @@ class PlayerProvider with ChangeNotifier {
       _logger.writeLog(
         message: "Player data for UID $_uid saved to Firestore.",
         payload: {
-          'action': 'save_player_data',
-          'uid': _uid,
+          "message": "Player data saved",
+          "context": {
+            "id": _uid,
+            "user": {
+              "playerName": _player!.playerName,
+              "level": _player!.level,
+              "xp": _player!.xp,
+            }
+          }
         },
       );
     } catch (e) {
@@ -249,9 +269,12 @@ class PlayerProvider with ChangeNotifier {
         message: "Error saving player data to Firestore: $e",
         severity: CloudLogSeverity.error,
         payload: {
-          'action': 'save_player_data_error',
-          'uid': _uid,
-          'error': e.toString(),
+          "message": "Error saving player data",
+          "context": {
+            "id": _uid,
+            "error": e.toString(),
+            "platform": defaultTargetPlatform.toString()
+          },
         },
       );
     }
@@ -477,16 +500,22 @@ class PlayerProvider with ChangeNotifier {
         await _playerDocRef!.delete();
         _logger.writeLog(
           message: "Player document for UID $_uid deleted from Firestore.",
-          payload: {'action': 'delete_player_document', 'uid': _uid},
+          payload: {
+            "message": "Player data reset",
+            "context": {"id": _uid}
+          },
         );
       } catch (e) {
         _logger.writeLog(
           message: "Error deleting player document: $e",
           severity: CloudLogSeverity.error,
           payload: {
-            'action': 'delete_player_document_error',
-            'uid': _uid,
-            'error': e.toString(),
+            "message": "Error deleting player document",
+            "context": {
+              "id": _uid,
+              "error": e.toString(),
+              "platform": defaultTargetPlatform.toString()
+            },
           },
         );
       }
@@ -497,8 +526,11 @@ class PlayerProvider with ChangeNotifier {
     await _savePlayerData();
     notifyListeners();
     _logger.writeLog(
-      message: "Player data has been reset locally and saved.",
-      payload: {'action': 'reset_player_data', 'uid': _uid},
+      message: "Player data has been reset in Firestore.",
+      payload: {
+        "message": "Player data reset",
+        "context": {"id": _uid}
+      },
     );
   }
 
@@ -575,10 +607,8 @@ class PlayerProvider with ChangeNotifier {
         message: "Attempted to add non-existent item: $itemId",
         severity: CloudLogSeverity.warning,
         payload: {
-          'action': 'add_non_existent_item_warning',
-          'itemId': itemId,
-          'quantity': quantity,
-          'uid': _uid
+          "message": "Attempted to add non-existent item",
+          "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
         },
       );
       return;
@@ -602,10 +632,8 @@ class PlayerProvider with ChangeNotifier {
     _logger.writeLog(
       message: "Added $quantity x $itemId to inventory for player $_uid.",
       payload: {
-        'action': 'add_item_to_inventory',
-        'itemId': itemId,
-        'quantity': quantity,
-        'uid': _uid
+        "message": "Item added to inventory",
+        "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
       },
     );
     _savePlayerData();
