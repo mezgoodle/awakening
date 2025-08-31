@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:firebase_ai/firebase_ai.dart';
+import 'package:flutter/foundation.dart';
 import '../models/player_model.dart';
 import '../models/quest_model.dart';
 
@@ -334,11 +335,9 @@ $itemRewardsInstruction
           if (itemData is Map<String, dynamic> &&
               itemData['itemId'] != null &&
               availableItemIds.contains(itemData['itemId'])) {
-            // <--- ВАЛІДАЦІЯ
-            // Додаємо тільки ті предмети, ID яких є в нашому списку
             itemRewards.add(itemData);
           } else {
-            print(
+            debugPrint(
                 "Warning: Gemini returned an invalid or non-existent itemId: ${itemData['itemId']}. Skipping.");
           }
         }

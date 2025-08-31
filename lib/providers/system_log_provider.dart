@@ -25,7 +25,7 @@ class SystemLogProvider with ChangeNotifier {
   SystemLogProvider();
 
   void update(PlayerProvider? playerProvider, CloudLoggerService? logger) {
-    print(
+    debugPrint(
         "SystemLogProvider UPDATE called. Logger is ${logger == null ? 'null' : 'NOT null'}");
     _playerProvider = playerProvider;
     _cloudLogger = logger;

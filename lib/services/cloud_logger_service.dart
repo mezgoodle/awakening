@@ -43,13 +43,13 @@ class CloudLoggerService {
       final client = await clientViaServiceAccount(credentials, scopes);
       _loggingApi = LoggingApi(client);
       _isInitialized = true;
-      print(
+      debugPrint(
           "CloudLoggerService Initialized Successfully (via Service Account). Project ID: $_projectId");
 
       await _getDeviceAndPackageInfo();
     } catch (e) {
-      print("!!! FATAL ERROR INITIALIZING CloudLoggerService: $e");
-      print(
+      debugPrint("!!! FATAL ERROR INITIALIZING CloudLoggerService: $e");
+      debugPrint(
           "!!! Logging to GCP will not work. Check 'assets/service_account.json'.");
       _isInitialized = false;
     }
@@ -102,7 +102,7 @@ class CloudLoggerService {
     if (!_isInitialized) {
       if (!_isInitialized) await _initialize();
       if (!_isInitialized) {
-        print("CloudLoggerService not initialized. Skipping log.");
+        debugPrint("CloudLoggerService not initialized. Skipping log.");
         return;
       }
     }

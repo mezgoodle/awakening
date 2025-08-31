@@ -151,8 +151,6 @@ class PlayerModel {
         return "Сприйняття";
       case PlayerStat.stamina:
         return "Витривалість";
-      default:
-        return "";
     }
   }
 

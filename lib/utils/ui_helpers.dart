@@ -31,7 +31,6 @@ void showSystemSnackBar(BuildContext context, SystemMessageModel message) {
       break;
     case MessageType.info:
     case MessageType.system:
-    default:
       backgroundColor = Colors.grey[800]!;
       iconData = Icons.info_rounded;
   }

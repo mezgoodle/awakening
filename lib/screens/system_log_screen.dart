@@ -24,7 +24,6 @@ class SystemLogScreen extends StatelessWidget {
         return Icons.warning_amber_rounded;
       case MessageType.info:
       case MessageType.system:
-      default:
         return Icons.info_outline_rounded;
     }
   }
@@ -48,7 +47,6 @@ class SystemLogScreen extends StatelessWidget {
         return Colors.orange[isDark ? 300 : 700]!;
       case MessageType.info:
       case MessageType.system:
-      default:
         return Colors.grey[isDark ? 400 : 600]!;
     }
   }
