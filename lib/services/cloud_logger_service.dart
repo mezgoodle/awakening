@@ -151,6 +151,9 @@ class CloudLoggerService {
       await _loggingApi.entries.write(request);
       debugPrint("Log sent to GCP: $message");
     } catch (e) {
+      final errorFromPayload = finalPayload['error'];
+      debugPrint("Tried to send log to GCP: $message");
+      debugPrint("Error from payload: $errorFromPayload");
       debugPrint("Error sending log to GCP: $e");
     }
   }
