@@ -115,7 +115,6 @@ class PlayerProvider with ChangeNotifier {
         _logger.writeLog(
             message: "Player data for UID $_uid loaded from Firestore.",
             payload: {
-              "message": "Player data loaded",
               "context": {
                 "user": {
                   "playerName": _player!.playerName,
@@ -130,7 +129,6 @@ class PlayerProvider with ChangeNotifier {
             message:
                 "No player data in Firestore for UID $_uid, creating new player.",
             payload: {
-              "message": "No player data found",
               "context": {
                 "id": _uid,
                 "user": {
@@ -253,7 +251,6 @@ class PlayerProvider with ChangeNotifier {
       _logger.writeLog(
         message: "Player data for UID $_uid saved to Firestore.",
         payload: {
-          "message": "Player data saved",
           "context": {
             "id": _uid,
             "user": {
@@ -269,12 +266,7 @@ class PlayerProvider with ChangeNotifier {
         message: "Error saving player data to Firestore: $e",
         severity: CloudLogSeverity.error,
         payload: {
-          "message": "Error saving player data",
-          "context": {
-            "id": _uid,
-            "error": e.toString(),
-            "platform": defaultTargetPlatform.toString()
-          },
+          "context": {"id": _uid, "error": e.toString()},
         },
       );
     }
@@ -511,11 +503,7 @@ class PlayerProvider with ChangeNotifier {
           severity: CloudLogSeverity.error,
           payload: {
             "message": "Error deleting player document",
-            "context": {
-              "id": _uid,
-              "error": e.toString(),
-              "platform": defaultTargetPlatform.toString()
-            },
+            "context": {"id": _uid, "error": e.toString()},
           },
         );
       }

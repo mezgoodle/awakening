@@ -51,20 +51,14 @@ class ItemProvider with ChangeNotifier {
 
       _itemDictionary = loadedItems;
       _logger.writeLog(
-        message: "Loaded ${_itemDictionary.length} items from Firestore.",
-        payload: {
-          "itemCount": _itemDictionary.length,
-          "timestamp": DateTime.now().toIso8601String(),
-        },
+        message: "Load items from Firestore.",
+        payload: {"itemCount": _itemDictionary.length},
       );
     } catch (e) {
       _logger.writeLog(
-        message: "Error loading items from Firestore: $e",
+        message: "Error loading items from Firestore",
         severity: CloudLogSeverity.error,
-        payload: {
-          "error": e.toString(),
-          "timestamp": DateTime.now().toIso8601String(),
-        },
+        payload: {"error": e.toString()},
       );
       _itemDictionary = {};
     }
