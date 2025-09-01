@@ -44,3 +44,17 @@ app.*.map.json
 
 # Service accounts
 service_account.json
+# Service accounts and secrets (generalized)
+service_account*.json
+**/service_account*.json
+**/google-services.json
+**/GoogleService-Info*.plist
+**/firebase_app_id_file.json
+
+# Android signing and local properties
+android/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pem

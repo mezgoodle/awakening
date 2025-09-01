@@ -1,9 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, debugPrint, kIsWeb;
+    show defaultTargetPlatform, debugPrint, kIsWeb, TargetPlatform;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:googleapis/logging/v2.dart';
 import 'package:googleapis_auth/auth_io.dart';
@@ -63,16 +62,24 @@ class CloudLoggerService {
       if (kIsWeb) {
         _deviceInfo = (await deviceInfoPlugin.webBrowserInfo).data;
       } else {
-        if (Platform.isAndroid) {
-          _deviceInfo = (await deviceInfoPlugin.androidInfo).data;
-        } else if (Platform.isIOS) {
-          _deviceInfo = (await deviceInfoPlugin.iosInfo).data;
-        } else if (Platform.isLinux) {
-          _deviceInfo = (await deviceInfoPlugin.linuxInfo).data;
-        } else if (Platform.isMacOS) {
-          _deviceInfo = (await deviceInfoPlugin.macOsInfo).data;
-        } else if (Platform.isWindows) {
-          _deviceInfo = (await deviceInfoPlugin.windowsInfo).data;
+        switch (defaultTargetPlatform) {
+          case TargetPlatform.android:
+            _deviceInfo = (await deviceInfoPlugin.androidInfo).data;
+            break;
+          case TargetPlatform.iOS:
+            _deviceInfo = (await deviceInfoPlugin.iosInfo).data;
+            break;
+          case TargetPlatform.linux:
+            _deviceInfo = (await deviceInfoPlugin.linuxInfo).data;
+            break;
+          case TargetPlatform.macOS:
+            _deviceInfo = (await deviceInfoPlugin.macOsInfo).data;
+            break;
+          case TargetPlatform.windows:
+            _deviceInfo = (await deviceInfoPlugin.windowsInfo).data;
+            break;
+          default:
+            _deviceInfo = null;
         }
       }
     } catch (e) {
@@ -108,7 +115,8 @@ class CloudLoggerService {
     }
 
     final fullLogName = 'projects/$_projectId/logs/$logName';
-    final platform = defaultTargetPlatform.toString().split('.').last;
+    final platform =
+        kIsWeb ? 'web' : defaultTargetPlatform.toString().split('.').last;
 
     final Map<String, dynamic> globalContext = {
       'message': message,
