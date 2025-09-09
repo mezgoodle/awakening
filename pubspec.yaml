@@ -39,3 +39,4 @@ flutter:
 
   assets:
     - assets/service_account.json
+    - assets/icons/
