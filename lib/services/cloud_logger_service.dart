@@ -131,10 +131,10 @@ class CloudLoggerService {
       'sessionId': _sessionId,
     };
 
-    final finalPayload = Map<String, dynamic>.from(globalContext);
-    if (payload != null) {
-      finalPayload['context'] = payload;
-    }
+    final finalPayload = <String, dynamic>{
+      ...globalContext,
+      if (payload != null) ...payload
+    };
 
     final entry = LogEntry(
       logName: fullLogName,

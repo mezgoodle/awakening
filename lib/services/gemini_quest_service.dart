@@ -375,7 +375,7 @@ $itemRewardsInstruction
       return quest;
     } catch (e) {
       _logger.writeLog(
-        message: "Error generating quest with Gemini API",
+        message: "Error generating quest via FirebaseAI (Gemini)",
         severity: CloudLogSeverity.error,
         payload: {
           "prompt": prompt,
@@ -385,7 +385,7 @@ $itemRewardsInstruction
       );
       if (e is FirebaseAIException) {
         _logger.writeLog(
-          message: "GenerativeAIException details",
+          message: "FirebaseAIException details",
           severity: CloudLogSeverity.error,
           payload: {
             "prompt": prompt,

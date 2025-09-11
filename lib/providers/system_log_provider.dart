@@ -1,15 +1,12 @@
 import 'dart:collection';
 import 'package:awakening/providers/player_provider.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/services/cloud_logger_service.dart';
 
 class SystemLogProvider with ChangeNotifier {
   List<SystemMessageModel> _messages = [];
   SystemMessageModel? _latestMessageForSnackbar;
-
-  static const String _logKey = 'systemLogData';
 
   PlayerProvider? _playerProvider;
   CloudLoggerService? _cloudLogger;
@@ -45,8 +42,6 @@ class SystemLogProvider with ChangeNotifier {
 
   Future<void> clearLog() async {
     _messages.clear();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_logKey);
     notifyListeners();
   }
 }

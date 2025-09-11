@@ -83,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     } catch (e) {
       _logger.writeLog(
-        message: "Error during anonymous sign-in",
+        message: "AuthError: anonymous_sign_in_failed",
         severity: CloudLogSeverity.error,
         payload: {"error": e.toString()},
       );
