@@ -34,15 +34,17 @@ class SkillProvider with ChangeNotifier {
                 MapEntry(PlayerStat.values.byName(key), value as int));
 
         final effects = (data['effects'] as Map<String, dynamic>?)?.map(
-            (key, value) =>
-                MapEntry(SkillEffectType.values.byName(key), value as double));
+            (key, value) => MapEntry(
+                SkillEffectType.values.byName(key), (value as num).toDouble()));
 
         final duration = data['durationSeconds'] != null
-            ? Duration(seconds: data['durationSeconds'])
+            ? Duration(seconds: (data['durationSeconds'] as num).toInt())
             : null;
         final cooldown = data['cooldownSeconds'] != null
-            ? Duration(seconds: data['cooldownSeconds'])
+            ? Duration(seconds: (data['cooldownSeconds'] as num).toInt())
             : null;
+        final mpCost =
+            data['mpCost'] != null ? (data['mpCost'] as num).toDouble() : null;
 
         return SkillModel(
           id: data['id'] as String,
@@ -55,7 +57,7 @@ class SkillProvider with ChangeNotifier {
           skillPointCost: data['skillPointCost'] as int? ?? 1,
           statRequirements: statReqs ?? {},
           effects: effects ?? {},
-          mpCost: data['mpCost'] as double?,
+          mpCost: mpCost,
           duration: duration,
           cooldown: cooldown,
         );

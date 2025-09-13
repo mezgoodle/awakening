@@ -33,8 +33,8 @@ class ItemProvider with ChangeNotifier {
         final itemId = data['id'] as String;
 
         final effects = (data['effects'] as Map<String, dynamic>?)?.map(
-            (key, value) =>
-                MapEntry(ItemEffectType.values.byName(key), value as double));
+            (key, value) => MapEntry(
+                ItemEffectType.values.byName(key), (value as num).toDouble()));
 
         final itemTemplate = InventoryItem(
           itemId: itemId,
