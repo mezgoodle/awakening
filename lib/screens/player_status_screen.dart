@@ -111,7 +111,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
       case QuestDifficulty.E:
         return Colors.grey[500]!;
       case QuestDifficulty.F:
-      default:
         return Colors.grey[700]!;
     }
   }

@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'dart:async';
 
-import 'package:awakening/models/inventory_item_model.dart';
+import 'package:awakening/models/item_model.dart';
 import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/providers/item_provider.dart';
 import 'package:awakening/providers/quest_provider.dart';
@@ -115,7 +115,6 @@ class PlayerProvider with ChangeNotifier {
         _logger.writeLog(
             message: "Player data for UID $_uid loaded from Firestore.",
             payload: {
-              "message": "Player data loaded",
               "context": {
                 "user": {
                   "playerName": _player!.playerName,
@@ -130,7 +129,6 @@ class PlayerProvider with ChangeNotifier {
             message:
                 "No player data in Firestore for UID $_uid, creating new player.",
             payload: {
-              "message": "No player data found",
               "context": {
                 "id": _uid,
                 "user": {
@@ -253,7 +251,6 @@ class PlayerProvider with ChangeNotifier {
       _logger.writeLog(
         message: "Player data for UID $_uid saved to Firestore.",
         payload: {
-          "message": "Player data saved",
           "context": {
             "id": _uid,
             "user": {
@@ -269,12 +266,7 @@ class PlayerProvider with ChangeNotifier {
         message: "Error saving player data to Firestore: $e",
         severity: CloudLogSeverity.error,
         payload: {
-          "message": "Error saving player data",
-          "context": {
-            "id": _uid,
-            "error": e.toString(),
-            "platform": defaultTargetPlatform.toString()
-          },
+          "context": {"id": _uid, "error": e.toString()},
         },
       );
     }
@@ -511,11 +503,7 @@ class PlayerProvider with ChangeNotifier {
           severity: CloudLogSeverity.error,
           payload: {
             "message": "Error deleting player document",
-            "context": {
-              "id": _uid,
-              "error": e.toString(),
-              "platform": defaultTargetPlatform.toString()
-            },
+            "context": {"id": _uid, "error": e.toString()},
           },
         );
       }
@@ -536,12 +524,11 @@ class PlayerProvider with ChangeNotifier {
 
   void awardNewRank(QuestDifficulty newRank, SystemLogProvider slog) {
     if (_player!.playerRank.index < newRank.index) {
-      // Перевіряємо, чи новий ранг дійсно вищий
       _player!.playerRank = newRank;
       slog.addMessage(
           "Ранг Мисливця підвищено! Новий ранг: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
           MessageType.rankUp);
-      _savePlayerData(); // Зберігаємо зміни
+      _savePlayerData();
       notifyListeners();
       // _checkForAvailableRankUpChallenge(); // Перевіряємо, чи доступний наступний ранг-ап
     }
@@ -559,8 +546,9 @@ class PlayerProvider with ChangeNotifier {
 
     if (nextPotentialRankByLevel.index > currentRank.index &&
         !hasActiveRankUpQuest) {
-      QuestDifficulty targetRankForChallenge =
-          QuestDifficulty.values[currentRank.index + 1];
+      final nextIndex =
+          min(currentRank.index + 1, QuestDifficulty.values.length - 1);
+      final targetRankForChallenge = QuestDifficulty.values[nextIndex];
 
       if (targetRankForChallenge.index > nextPotentialRankByLevel.index) {
         slog.addMessage(

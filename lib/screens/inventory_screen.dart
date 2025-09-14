@@ -2,7 +2,7 @@ import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/inventory_item_model.dart';
+import '../models/item_model.dart';
 import '../providers/player_provider.dart';
 import '../providers/item_provider.dart';
 import '../providers/system_log_provider.dart';

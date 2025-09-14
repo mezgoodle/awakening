@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:awakening/services/cloud_logger_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:firebase_ai/firebase_ai.dart';
+import 'package:flutter/foundation.dart';
 import '../models/player_model.dart';
 import '../models/quest_model.dart';
 
@@ -12,25 +12,19 @@ class GeminiQuestService {
   static const String modelName = 'gemini-2.0-flash-001';
 
   GeminiQuestService()
-      : _model = GenerativeModel(
+      : _model = FirebaseAI.googleAI().generativeModel(
             model: modelName,
-            apiKey: dotenv.env['GEMINI_API_KEY']!,
             safetySettings: [
-              SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
-              SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.high),
               SafetySetting(
-                  HarmCategory.sexuallyExplicit, HarmBlockThreshold.high),
+                  HarmCategory.harassment, HarmBlockThreshold.high, null),
               SafetySetting(
-                  HarmCategory.dangerousContent, HarmBlockThreshold.high),
+                  HarmCategory.hateSpeech, HarmBlockThreshold.high, null),
+              SafetySetting(
+                  HarmCategory.sexuallyExplicit, HarmBlockThreshold.high, null),
+              SafetySetting(
+                  HarmCategory.dangerousContent, HarmBlockThreshold.high, null),
             ],
-            generationConfig: GenerationConfig(
-              // temperature: 0.7, // 0.0 - 1.0. Більше значення -> більш креативно, менше -> більш детерміновано
-              // topK: 40,
-              // topP: 0.95,
-              maxOutputTokens:
-                  1024, // Максимальна кількість токенів у відповіді
-              // responseMimeType: "application/json", // Якщо модель підтримує і ти впевнений у промпті
-            ));
+            generationConfig: GenerationConfig(maxOutputTokens: 1024));
 
   Future<QuestModel?> generateQuest({
     required PlayerModel player,
@@ -341,11 +335,9 @@ $itemRewardsInstruction
           if (itemData is Map<String, dynamic> &&
               itemData['itemId'] != null &&
               availableItemIds.contains(itemData['itemId'])) {
-            // <--- ВАЛІДАЦІЯ
-            // Додаємо тільки ті предмети, ID яких є в нашому списку
             itemRewards.add(itemData);
           } else {
-            print(
+            debugPrint(
                 "Warning: Gemini returned an invalid or non-existent itemId: ${itemData['itemId']}. Skipping.");
           }
         }
@@ -383,20 +375,22 @@ $itemRewardsInstruction
       return quest;
     } catch (e) {
       _logger.writeLog(
-        message: "Error generating quest with Gemini API: $e",
+        message: "Error generating quest via FirebaseAI (Gemini)",
         severity: CloudLogSeverity.error,
         payload: {
           "prompt": prompt,
           "model": modelName,
+          "error": e.toString(),
         },
       );
-      if (e is GenerativeAIException) {
+      if (e is FirebaseAIException) {
         _logger.writeLog(
-          message: "GenerativeAIException details: ${e.message}",
+          message: "FirebaseAIException details",
           severity: CloudLogSeverity.error,
           payload: {
             "prompt": prompt,
             "model": modelName,
+            "error": e.toString(),
           },
         );
       }

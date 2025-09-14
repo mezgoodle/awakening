@@ -29,7 +29,6 @@ class QuestCard extends StatelessWidget {
       case QuestDifficulty.E:
         return Colors.grey[500]!;
       case QuestDifficulty.F:
-      default:
         return Colors.grey[700]!;
     }
   }

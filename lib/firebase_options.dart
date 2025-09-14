@@ -33,10 +33,7 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -50,19 +47,30 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC7TMHc0AMNz21gpQoDXQ6DtHRckII6mQU',
-    appId: '1:342507382959:web:1827cb678d9bc31e270c5a',
-    messagingSenderId: '342507382959',
-    projectId: 'awakening-549f0',
-    authDomain: 'awakening-549f0.firebaseapp.com',
-    storageBucket: 'awakening-549f0.firebasestorage.app',
+    apiKey: 'AIzaSyBzZHIh76HG_cWaUyRsQQDdUSJhC3tPCP0',
+    appId: '1:917334644935:web:1f31c97a5441f4278506e2',
+    messagingSenderId: '917334644935',
+    projectId: 'awakening-3b7a9',
+    authDomain: 'awakening-3b7a9.firebaseapp.com',
+    storageBucket: 'awakening-3b7a9.firebasestorage.app',
+    measurementId: 'G-Z5EC3C25NX',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDHJfTdDg8ODY3xxtCzbE6zXY-8IKr8vII',
-    appId: '1:342507382959:android:95a77955f3e2b1a6270c5a',
-    messagingSenderId: '342507382959',
-    projectId: 'awakening-549f0',
-    storageBucket: 'awakening-549f0.firebasestorage.app',
+    apiKey: 'AIzaSyA7Duc_gcD00CNRYjFyA9H9ccspWzPIieY',
+    appId: '1:917334644935:android:3628ebccbf160cc78506e2',
+    messagingSenderId: '917334644935',
+    projectId: 'awakening-3b7a9',
+    storageBucket: 'awakening-3b7a9.firebasestorage.app',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyBzZHIh76HG_cWaUyRsQQDdUSJhC3tPCP0',
+    appId: '1:917334644935:web:387a184c1ec04b448506e2',
+    messagingSenderId: '917334644935',
+    projectId: 'awakening-3b7a9',
+    authDomain: 'awakening-3b7a9.firebaseapp.com',
+    storageBucket: 'awakening-3b7a9.firebasestorage.app',
+    measurementId: 'G-7CW7QTL943',
   );
 }

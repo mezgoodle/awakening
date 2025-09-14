@@ -1,24 +1,27 @@
-import 'package:awakening/providers/item_provider.dart';
-import 'package:awakening/providers/theme_provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'providers/player_provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'providers/quest_provider.dart';
-import 'providers/system_log_provider.dart';
-import 'providers/skill_provider.dart';
-import 'screens/splash_screen.dart';
+import 'package:awakening/providers/player_provider.dart';
+import 'package:awakening/providers/quest_provider.dart';
+import 'package:awakening/providers/system_log_provider.dart';
+import 'package:awakening/screens/splash_screen.dart';
+import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:awakening/theme/theme.dart';
+import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
+// Providers
+import 'package:awakening/providers/theme_provider.dart';
+import 'package:awakening/providers/skill_provider.dart';
+import 'package:awakening/providers/item_provider.dart';
+
+// Firebase
 import 'package:firebase_core/firebase_core.dart';
-import 'services/cloud_logger_service.dart';
 import 'firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -27,65 +30,50 @@ Future<void> main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        // --- 1. Базові Сервіси та Провайдери без Залежностей ---
-        Provider<CloudLoggerService>(
-          create: (_) => CloudLoggerService(),
-          lazy: false,
-        ),
-        // Надаємо сервіс автентифікації.
-        Provider<FirebaseAuth>(
-          create: (_) => FirebaseAuth.instance,
-        ),
-        // SkillProvider поки що не залежить від інших, тому створюємо його тут.
-        ChangeNotifierProvider(create: (_) => SkillProvider()),
-        // ItemProvider також не має залежностей, тому створюємо його тут.
-        ChangeNotifierProvider(create: (_) => ItemProvider()),
+  runApp(MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      // --- 1. Basic services and providers without dependencies ---
+      Provider<CloudLoggerService>(
+        create: (_) => CloudLoggerService(),
+        lazy: false,
+      ),
+      Provider<FirebaseAuth>(
+        create: (_) => FirebaseAuth.instance,
+      ),
+      ChangeNotifierProvider(create: (_) => SkillProvider()),
+      ChangeNotifierProvider(create: (_) => ItemProvider()),
+      // --- 2. Services and providers with dependencies ---
+      ChangeNotifierProxyProvider3<FirebaseAuth, SkillProvider, ItemProvider,
+          PlayerProvider>(
+        create: (context) => PlayerProvider(null, null, null, null),
+        update: (context, auth, skillProvider, itemProvider,
+            previousPlayerProvider) {
+          previousPlayerProvider!
+              .update(auth, skillProvider, itemProvider, null);
+          return previousPlayerProvider;
+        },
+      ),
 
-        // --- 2. Провайдери, що Залежать від Інших (Проксі-Провайдери) ---
+      ChangeNotifierProxyProvider2<PlayerProvider, ItemProvider, QuestProvider>(
+        create: (context) => QuestProvider(),
+        update: (context, playerProvider, itemProvider, previousQuestProvider) {
+          previousQuestProvider!.update(playerProvider, itemProvider);
+          return previousQuestProvider;
+        },
+      ),
 
-        // PlayerProvider залежить від FirebaseAuth та SkillProvider, ItemProvider.
-        ChangeNotifierProxyProvider3<FirebaseAuth, SkillProvider, ItemProvider,
-            PlayerProvider>(
-          create: (context) =>
-              PlayerProvider(null, null, null, null), // Початкове створення
-          update: (context, auth, skillProvider, itemProvider,
-              previousPlayerProvider) {
-            // Оновлюємо PlayerProvider, передаючи йому актуальні залежності.
-            previousPlayerProvider!
-                .update(auth, skillProvider, itemProvider, null);
-            return previousPlayerProvider;
-          },
-        ),
-
-        // QuestProvider залежить від PlayerProvider та ItemProvider.
-        ChangeNotifierProxyProvider2<PlayerProvider, ItemProvider,
-            QuestProvider>(
-          create: (context) => QuestProvider(),
-          update:
-              (context, playerProvider, itemProvider, previousQuestProvider) {
-            previousQuestProvider!.update(playerProvider, itemProvider);
-            return previousQuestProvider;
-          },
-        ),
-
-        // SystemLogProvider залежить від PlayerProvider та CloudLoggerService.
-        ChangeNotifierProxyProvider2<PlayerProvider, CloudLoggerService,
-            SystemLogProvider>(
-          create: (context) => SystemLogProvider(),
-          update: (context, playerProvider, logger, previousLogProvider) {
-            // Оновлюємо SystemLogProvider, передаючи йому обидві залежності.
-            previousLogProvider!.update(playerProvider, logger);
-            return previousLogProvider;
-          },
-        ),
-      ],
-      child: const MyApp(),
-    ),
-  );
+      ChangeNotifierProxyProvider2<PlayerProvider, CloudLoggerService,
+          SystemLogProvider>(
+        create: (context) => SystemLogProvider(),
+        update: (context, playerProvider, logger, previousLogProvider) {
+          previousLogProvider!.update(playerProvider, logger);
+          return previousLogProvider;
+        },
+      ),
+    ],
+    child: const MyApp(),
+  ));
 }
 
 class MyApp extends StatelessWidget {
