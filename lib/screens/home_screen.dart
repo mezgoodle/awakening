@@ -113,47 +113,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initDailyQuests() async {
     final playerProvider = context.read<PlayerProvider>();
     final slog = context.read<SystemLogProvider>();
-    // Чекаємо, поки PlayerProvider завантажить дані, якщо він це робить асинхронно
-    // і має спосіб повідомити про завершення.
-    // Оскільки PlayerProvider має isLoading, ми можемо чекати на його зміну.
-    // Але простіше просто передати його в QuestProvider.
-    // PlayerProvider() починає завантаження.
-    // QuestProvider() починає завантаження.
-    // Вони можуть завершитися в різний час.
 
-    // Гарантуємо, що playerProvider не isLoading
-    if (playerProvider.isLoading) {
-      // Простий спосіб зачекати - це невелика затримка, але це погано.
-      // Або додати слухача до PlayerProvider.
-      // Або QuestProvider повинен сам вміти чекати або отримувати оновлений PlayerProvider.
-      // Зараз PlayerProvider передається як аргумент, тому це актуальні дані на момент виклику.
-
-      // Давайте зробимо так: якщо playerProvider ще завантажується, ми спробуємо
-      // викликати генерацію квестів трохи пізніше або коли він стане доступним.
-      // Найпростіше - покластися на те, що на момент, коли користувач відкриє екран квестів,
-      // дані гравця вже будуть.
-      // Або, як варіант, QuestProvider при генерації може перевіряти playerProvider.isLoading
-      // і якщо так, то або не генерувати, або генерувати "базові" квести.
-
-      // Поки що залишимо як є, з викликом в initState.
-      // `generateDailyQuestsIfNeeded` використовує playerProvider.player.level,
-      // який буде 1, якщо дані гравця ще не завантажені. Це може бути прийнятним для першого разу.
-      // Або ж, ми можемо зробити так, щоб `PlayerProvider` повертав Future зі свого конструктора
-      // чи методу ініціалізації, і чекати його тут.
-
-      // Найбільш "чистий" спосіб - це коли PlayerProvider повністю ініціалізований,
-      // тоді ініціалізувати QuestProvider, передаючи йому вже готовий PlayerProvider.
-      // Це можна зробити через ChangeNotifierProxyProvider, якщо QuestProvider залежить від PlayerProvider
-      // при створенні. Але він залежить тільки для одного методу.
-
-      // Поки що:
-      // Якщо PlayerProvider не завантажений, generateDailyQuestsIfNeeded
-      // може використати рівень 1 для розрахунку нагород. Це не страшно.
-      // При наступному відкритті (наступного дня) дані вже будуть.
-      await context
-          .read<QuestProvider>()
-          .generateDailyQuestsIfNeeded(playerProvider, slog);
-    } else {
+    if (!playerProvider.isLoading) {
       await context
           .read<QuestProvider>()
           .generateDailyQuestsIfNeeded(playerProvider, slog);

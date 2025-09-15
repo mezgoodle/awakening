@@ -28,7 +28,6 @@ class PlayerModel {
   List<String> learnedSkillIds;
   Map<PhysicalActivity, dynamic>? baselinePhysicalPerformance;
   Map<String, String> activeBuffs;
-  bool initialSurveyCompleted;
   late QuestDifficulty playerRank;
 
   late int maxHp;
@@ -52,7 +51,6 @@ class PlayerModel {
     this.availableStatPoints = 0,
     this.availableSkillPoints = 0,
     this.baselinePhysicalPerformance,
-    this.initialSurveyCompleted = false,
     this.playerRank = QuestDifficulty.F,
     int? loadedCurrentHp,
     int? loadedCurrentMp,
@@ -167,7 +165,6 @@ class PlayerModel {
       'baselinePhysicalPerformance': baselinePhysicalPerformance?.map(
         (key, value) => MapEntry(key.name, value),
       ),
-      'initialSurveyCompleted': initialSurveyCompleted,
       'activeBuffs': activeBuffs,
       'inventory': inventory,
       'playerRank': playerRank.name,
@@ -228,7 +225,6 @@ class PlayerModel {
       initialInventory: (json['inventory'] as List<dynamic>?)
           ?.map((item) => Map<String, dynamic>.from(item))
           .toList(),
-      initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       playerRank: json['playerRank'] != null &&
               (json['playerRank'] as String).isNotEmpty
           ? QuestDifficulty.values.byName(json['playerRank'] as String)

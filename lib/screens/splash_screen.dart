@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 
 import '../providers/player_provider.dart';
 import 'home_screen.dart';
-import 'initial_survey_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -102,11 +101,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _navigate(PlayerProvider playerProvider) {
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (context) => playerProvider.player.initialSurveyCompleted
-          ? const HomeScreen()
-          : const InitialSurveyScreen(),
-    ));
+    Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeScreen()));
   }
 
   void _showErrorAndStay() {

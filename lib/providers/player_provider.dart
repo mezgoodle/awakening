@@ -426,38 +426,6 @@ class PlayerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void applyInitialStatBonuses(Map<PlayerStat, int> bonuses) {
-    if (_isLoading || _player!.initialSurveyCompleted) {
-      if (_player!.initialSurveyCompleted) {
-        return;
-      }
-    }
-
-    bool statsAffectingHpMpChanged = false;
-    bonuses.forEach((stat, bonusAmount) {
-      if (bonusAmount > 0) {
-        _player!.stats[stat] = (_player!.stats[stat] ?? 0) + bonusAmount;
-        if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
-          statsAffectingHpMpChanged = true;
-        }
-      }
-    });
-
-    if (statsAffectingHpMpChanged) {
-      _player!.onStatsChanged();
-    }
-
-    _savePlayerData();
-    notifyListeners();
-  }
-
-  void setInitialSurveyCompleted(bool completed) {
-    if (_isLoading) return;
-    _player!.initialSurveyCompleted = completed;
-    _savePlayerData();
-    notifyListeners();
-  }
-
   void takePlayerDamage(int amount) {
     if (_isLoading) return;
     _player!.takeDamage(amount);
