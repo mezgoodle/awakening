@@ -41,3 +41,8 @@ flutter:
   assets:
     - assets/service_account.json
     - assets/icons/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
