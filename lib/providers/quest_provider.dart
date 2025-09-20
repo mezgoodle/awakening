@@ -294,7 +294,6 @@ class QuestProvider with ChangeNotifier {
           maxDailyQuests - existingDailyQuests.length;
 
       if (questsToGenerateCount <= 0) {
-        await _updateLastGenerationDate(todayDateOnly);
         _isGeneratingQuest = false;
         notifyListeners();
         return;
@@ -355,34 +354,8 @@ class QuestProvider with ChangeNotifier {
       await Future.wait(questGenerationFutures);
       slog.addMessage("Щоденні завдання оновлено.", MessageType.info);
 
-      await _updateLastGenerationDate(todayDateOnly);
-
       _isGeneratingQuest = false;
       notifyListeners();
-    }
-  }
-
-  Future<void> _updateLastGenerationDate(DateTime date) async {
-    if (_playerDocRef == null) return;
-    try {
-      await _playerDocRef!.set(
-          {_lastDailyQuestGenerationKey: date.toIso8601String()},
-          SetOptions(merge: true));
-      _logger.writeLog(
-          message:
-              "Daily quest generation date updated to ${date.toIso8601String()}",
-          payload: {"userId": _playerProvider?.getUserId(), "date": date});
-    } catch (e) {
-      _logger.writeLog(
-        message: "Error updating daily quest generation date: $e",
-        severity: CloudLogSeverity.error,
-        payload: {
-          "context": {
-            "userId": _playerProvider?.getUserId(),
-            "error": e.toString()
-          }
-        },
-      );
     }
   }
 

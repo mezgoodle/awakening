@@ -4,8 +4,6 @@ import 'package:provider/provider.dart';
 import 'player_status_screen.dart';
 import 'quests_screen.dart';
 import 'skills_screen.dart';
-import '../providers/quest_provider.dart';
-import '../providers/player_provider.dart';
 import '../providers/system_log_provider.dart';
 import '../utils/ui_helpers.dart';
 
@@ -35,56 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Викликаємо генерацію щоденних квестів при ініціалізації HomeScreen
-    // Це краще місце, ніж main.dart -> MyApp build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Використовуємо context.read для одноразового виклику
-      final playerProvider = context.read<PlayerProvider>();
-      final slog = context.read<SystemLogProvider>();
-      // Переконуємось, що дані гравця завантажені перед генерацією квестів,
-      // щоб квести могли базуватись на рівні гравця.
-      if (!playerProvider.isLoading) {
-        context
-            .read<QuestProvider>()
-            .generateDailyQuestsIfNeeded(playerProvider, slog);
-      } else {
-        // Якщо дані ще завантажуються, можна додати слухача, щоб викликати після завантаження
-        // Або покластися на те, що generateDailyQuestsIfNeeded буде викликано при першому
-        // відкритті вкладки квестів, якщо там є така логіка.
-        // Простіший варіант: користувач сам перейде на вкладку квестів, і там це обробиться.
-        // Або, якщо generateDailyQuestsIfNeeded може безпечно працювати з дефолтним PlayerModel,
-        // то можна викликати одразу. Наш поточний PlayerProvider ініціалізується з дефолтним
-        // PlayerModel, тому це має бути безпечно.
-        // Однак, playerProvider.player.level буде 1, якщо дані ще не завантажені.
-        // Тому краще дочекатися.
-
-        // Слухач для playerProvider.isLoading
-        // Цей підхід може бути складним, якщо PlayerProvider не повідомляє про закінчення завантаження
-        // так, щоб це легко було відловити тут.
-        // Альтернатива: викликати в `QuestsScreen` в `initState` або при першому білді.
-        // Або зробити `PlayerProvider` таким, що він повертає Future при ініціалізації.
-
-        // Найпростіше: якщо generateDailyQuestsIfNeeded викликається з QuestProvider.isLoading == false,
-        // то playerProvider теж вже має бути завантажений.
-        // Тому що QuestProvider викликає _loadQuests(), який асинхронний.
-        // А PlayerProvider викликає _loadPlayerData(), який теж асинхронний.
-        // Вони працюють паралельно.
-        // Ми можемо дочекатися завантаження обох провайдерів.
-        // АБО, як я зробив у QuestProvider, передавати PlayerProvider як аргумент
-        // і використовувати вже завантажені дані гравця.
-        // Наш PlayerProvider має _isLoading, тому це ОК.
-        // Поточна логіка в QuestProvider вже використовує переданий playerProvider.
-
-        // Проблема: PlayerProvider може ще завантажувати дані, коли ми викликаємо generateDailyQuestsIfNeeded.
-        // Рішення: зробимо PlayerProvider "готовим" після _loadPlayerData.
-        // `generateDailyQuestsIfNeeded` приймає `playerProvider`.
-        // Усередині `generateDailyQuestsIfNeeded` ми використовуємо `playerProvider.player.level`.
-        // Якщо `playerProvider` ще `isLoading`, то `player.level` буде дефолтним (1).
-
-        // Кращий підхід:
-        _initDailyQuests();
-      }
-    });
     final systemLogProvider = context.read<SystemLogProvider>();
     systemLogProvider.addListener(_showLatestSystemMessage);
   }
@@ -107,17 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
           showSystemSnackBar(context, message);
         }
       });
-    }
-  }
-
-  Future<void> _initDailyQuests() async {
-    final playerProvider = context.read<PlayerProvider>();
-    final slog = context.read<SystemLogProvider>();
-
-    if (!playerProvider.isLoading) {
-      await context
-          .read<QuestProvider>()
-          .generateDailyQuestsIfNeeded(playerProvider, slog);
     }
   }
 
