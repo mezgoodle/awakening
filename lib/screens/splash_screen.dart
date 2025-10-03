@@ -59,22 +59,12 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       if (user != null) {
-        // 2. Ініціалізація PlayerProvider з UID
-        // PlayerProvider тепер буде залежати від uid, тому ми не можемо просто
-        // викликати його методи тут напряму, якщо він створюється в MultiProvider.
-        // Замість цього, ми можемо оновити його стан, який він очікує.
-        // В нашому новому підході з ChangeNotifierProxyProvider, PlayerProvider
-        // буде автоматично оновлюватися, коли отримає uid.
-        // Отже, тут нам потрібно лише дочекатися, поки PlayerProvider завантажить дані.
-
         final playerProvider = context.read<PlayerProvider>();
 
-        // Додаємо слухача, щоб дочекатися завершення завантаження даних
         if (playerProvider.isLoading) {
           playerProvider.addListener(_onPlayerProviderLoaded);
         } else {
-          // Якщо дані вже завантажені (дуже малоймовірно, але можливо)
-          _navigate(playerProvider);
+          _navigate();
         }
       } else {
         // Обробка помилки входу
@@ -93,13 +83,12 @@ class _SplashScreenState extends State<SplashScreen> {
   void _onPlayerProviderLoaded() {
     final playerProvider = context.read<PlayerProvider>();
     if (!playerProvider.isLoading && mounted) {
-      // Важливо відписатися, щоб уникнути повторних викликів
       playerProvider.removeListener(_onPlayerProviderLoaded);
-      _navigate(playerProvider);
+      _navigate();
     }
   }
 
-  void _navigate(PlayerProvider playerProvider) {
+  void _navigate() {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const HomeScreen()));
@@ -107,12 +96,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _showErrorAndStay() {
     if (!mounted) return;
-    // Показати помилку і залишитися на сплеш-скріні
-    // (в реальному додатку тут може бути кнопка "Спробувати ще")
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content:
             Text("Помилка автентифікації. Перевірте інтернет-з'єднання.")));
-    // Можна додати віджет з повідомленням про помилку замість індикатора
   }
 
   @override
