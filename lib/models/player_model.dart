@@ -43,7 +43,7 @@ class PlayerModel {
   List<Map<String, dynamic>> inventory;
 
   PlayerModel({
-    this.playerName = "Мисливець",
+    this.playerName = "Hunter",
     this.level = 1,
     this.xp = 0,
     Map<PlayerStat, int>? initialStats,
@@ -87,14 +87,12 @@ class PlayerModel {
         (level * baseMpPerLevel) + (intelligence * mpPerIntelligencePoint) + 20;
   }
 
-  // Метод, що викликається при підвищенні рівня (з PlayerProvider)
   void onLevelUp() {
     _calculateAndUpdateHpMp();
     currentHp = maxHp;
     currentMp = maxMp;
   }
 
-  // Метод, що викликається при зміні характеристик (з PlayerProvider)
   void onStatsChanged() {
     int oldMaxHp = maxHp;
     int oldMaxMp = maxMp;
@@ -140,15 +138,15 @@ class PlayerModel {
   static String getStatName(PlayerStat stat) {
     switch (stat) {
       case PlayerStat.strength:
-        return "Сила";
+        return "Strength";
       case PlayerStat.agility:
-        return "Спритність";
+        return "Agility";
       case PlayerStat.intelligence:
-        return "Інтелект";
+        return "Intelligence";
       case PlayerStat.perception:
-        return "Сприйняття";
+        return "Perception";
       case PlayerStat.stamina:
-        return "Витривалість";
+        return "Stamina";
     }
   }
 
@@ -212,7 +210,7 @@ class PlayerModel {
     }
 
     return PlayerModel(
-      playerName: json['playerName'] as String? ?? "Мисливець",
+      playerName: json['playerName'] as String? ?? "Hunter",
       level: json['level'] as int? ?? 1,
       xp: json['xp'] as int? ?? 0,
       initialStats: loadedStats,

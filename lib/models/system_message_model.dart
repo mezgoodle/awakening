@@ -1,15 +1,15 @@
 import 'package:uuid/uuid.dart';
 
 enum MessageType {
-  info, // Загальна інформація
-  levelUp, // Підвищення рівня
-  rankUp, // Підвищення рангу
-  questCompleted, // Завдання виконано
-  questAdded, // Завдання додано
-  statsIncreased, // Характеристики збільшено (за очки)
-  error, // Помилка
-  warning, // Попередження
-  system, // Системне повідомлення (наприклад, від Gemini)
+  info,
+  levelUp,
+  rankUp,
+  questCompleted,
+  questAdded,
+  statsIncreased,
+  error,
+  warning,
+  system,
 }
 
 class SystemMessageModel {
@@ -17,14 +17,14 @@ class SystemMessageModel {
   final String text;
   final MessageType type;
   final DateTime timestamp;
-  bool isRead; // Для майбутнього, якщо потрібно буде відмічати прочитані в лозі
+  bool isRead;
 
   SystemMessageModel({
     String? id,
     required this.text,
     required this.type,
     DateTime? timestamp,
-    this.isRead = false, // За замовчуванням нові повідомлення не прочитані
+    this.isRead = false,
   })  : id = id ?? const Uuid().v4(),
         timestamp = timestamp ?? DateTime.now();
 
@@ -32,7 +32,7 @@ class SystemMessageModel {
     return {
       'id': id,
       'text': text,
-      'type': type.name, // Зберігаємо enum як рядок
+      'type': type.name,
       'timestamp': timestamp.toIso8601String(),
       'isRead': isRead,
     };

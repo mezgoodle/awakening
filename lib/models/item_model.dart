@@ -1,17 +1,16 @@
 enum ItemType {
-  potion, // Зілля (витратний матеріал)
-  key, // Ключ (для підземель)
-  material, // Матеріал для крафту
-  equipment, // Екіпірування
-  collectible, // Колекційний предмет
+  potion,
+  key,
+  material,
+  equipment,
+  collectible,
 }
 
 enum ItemEffectType {
-  restoreHp, // Відновити фіксовану кількість HP
-  restoreMp, // Відновити фіксовану кількість MP
-  restoreHpPercent, // Відновити % від maxHP
-  restoreMpPercent, // Відновити % від maxMP
-  // ... інші можливі ефекти в майбутньому
+  restoreHp,
+  restoreMp,
+  restoreHpPercent,
+  restoreMpPercent,
 }
 
 class InventoryItem {
@@ -73,8 +72,8 @@ class InventoryItem {
 
     final templateItem = itemDictionary[itemId];
 
-    const unknownItemName = 'Невідомий Предмет';
-    const unknownItemDescription = 'Опис відсутній';
+    const unknownItemName = 'Unknown Item';
+    const unknownItemDescription = 'Unknown Item Description';
     const unknownItemIcon = 'assets/icons/items/unknown.svg';
 
     if (templateItem == null) {

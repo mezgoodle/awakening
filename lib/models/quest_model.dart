@@ -1,17 +1,15 @@
 import 'package:uuid/uuid.dart';
 import 'player_model.dart';
 
-// Типи квестів
 enum QuestType {
-  daily, // Щоденний
-  weekly, // Щотижневий (поки не використовуємо, але закладаємо)
-  milestone, // Досягнення певного етапу
-  generated, // Згенерований (наприклад, через Gemini)
-  story, // Сюжетний (для майбутнього)
-  rankUpChallenge, // Виклик підвищення рангу
+  daily,
+  weekly,
+  milestone,
+  generated,
+  story,
+  rankUpChallenge,
 }
 
-// Складність квестів
 enum QuestDifficulty { F, E, D, C, B, A, S }
 
 class QuestModel {
@@ -23,13 +21,13 @@ class QuestModel {
   final QuestDifficulty difficulty;
   final PlayerStat? targetStat;
   bool isCompleted;
-  final DateTime? createdAt; // Коли квест було створено/додано
-  DateTime? completedAt; // Коли квест було виконано
+  final DateTime? createdAt;
+  DateTime? completedAt;
   final int? hpCostOnCompletion;
-  List<Map<String, dynamic>>? itemRewards; // Нагороди у вигляді предметів
+  List<Map<String, dynamic>>? itemRewards;
 
   QuestModel({
-    String? id, // Дозволяємо передавати id або генеруємо
+    String? id,
     required this.title,
     required this.description,
     required this.xpReward,
@@ -41,26 +39,23 @@ class QuestModel {
     this.completedAt,
     this.hpCostOnCompletion,
     this.itemRewards,
-  })  : id = id ?? const Uuid().v4(), // Генеруємо унікальний ID, якщо не надано
+  })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
 
-  // Метод для зручного отримання назви типу квесту
   static String getQuestTypeName(QuestType type) {
     switch (type) {
       case QuestType.daily:
-        return "Щоденне";
+        return "Daily";
       case QuestType.weekly:
-        return "Щотижневе";
+        return "Weekly";
       case QuestType.milestone:
-        return "Віха";
+        return "Milestone";
       case QuestType.generated:
-        return "Згенероване";
+        return "Generated";
       case QuestType.story:
-        return "Сюжетне";
+        return "Story";
       case QuestType.rankUpChallenge:
-        return "Рангове Випробування";
-      default:
-        return "Завдання";
+        return "RankUpChallenge";
     }
   }
 
@@ -74,11 +69,11 @@ class QuestModel {
       'title': title,
       'description': description,
       'xpReward': xpReward,
-      'type': type.name, // Зберігаємо як рядок
-      'difficulty': difficulty.name, // Зберігаємо як рядок
-      'targetStat': targetStat?.name, // Зберігаємо як рядок або null
+      'type': type.name,
+      'difficulty': difficulty.name,
+      'targetStat': targetStat?.name,
       'isCompleted': isCompleted,
-      'createdAt': createdAt?.toIso8601String(), // Зберігаємо як ISO рядок
+      'createdAt': createdAt?.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
       'hpCostOnCompletion': hpCostOnCompletion,
       'itemRewards': itemRewards,
