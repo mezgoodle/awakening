@@ -1,6 +1,5 @@
-// lib/utils/ui_helpers.dart
 import 'package:flutter/material.dart';
-import '../models/system_message_model.dart'; // Імпорт моделі
+import '../models/system_message_model.dart';
 
 void showSystemSnackBar(BuildContext context, SystemMessageModel message) {
   Color backgroundColor;
@@ -47,8 +46,7 @@ void showSystemSnackBar(BuildContext context, SystemMessageModel message) {
         ],
       ),
       backgroundColor: backgroundColor,
-      behavior:
-          SnackBarBehavior.floating, // Щоб виглядав як системне повідомлення
+      behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       margin: const EdgeInsets.all(10),
       duration: const Duration(seconds: 4),

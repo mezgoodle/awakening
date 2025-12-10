@@ -34,149 +34,146 @@ class GeminiQuestService {
     List<String> availableItemIds = const [],
   }) async {
     final playerName =
-        player.playerName == "Мисливець" ? "гравець" : player.playerName;
+        player.playerName == "Hunter" ? "player" : player.playerName;
     final playerRankName = QuestModel.getQuestDifficultyName(player.playerRank);
 
     String baselinePerformancePrompt = "";
     if (player.baselinePhysicalPerformance != null &&
         player.baselinePhysicalPerformance!.isNotEmpty) {
       baselinePerformancePrompt +=
-          "\n\nБазові фізичні показники гравця (за результатами самооцінки):";
+          "\n\nBaseline player physical stats (based on self-assessment):";
       player.baselinePhysicalPerformance!.forEach((activity, value) {
         String activityName = "";
         switch (activity) {
           case PhysicalActivity.pullUps:
-            activityName = "Максимум підтягувань";
+            activityName = "Max Pull-ups";
             break;
           case PhysicalActivity.pushUps:
-            activityName = "Максимум віджимань";
+            activityName = "Max Push-ups";
             break;
           case PhysicalActivity.runningDurationInMin:
-            activityName = "Тривалість бігу (хв)";
+            activityName = "Running Duration (min)";
             break;
           case PhysicalActivity.regularExercise:
-            activityName = "Регулярно займається спортом";
+            activityName = "Exercises Regularly";
             break;
         }
         baselinePerformancePrompt += "\n- $activityName: $value";
       });
       baselinePerformancePrompt +=
-          "\nВраховуй ці показники при генерації фізичних завдань (на Силу, Спритність, Витривалість), щоб вони були складними, але досяжними. Якщо, наприклад, гравець вказав 0 підтягувань, не давай завдання на підтягування, а запропонуй підготовчі вправи (наприклад, австралійські підтягування, негативні підтягування або вправи для зміцнення спини/рук). Адаптуй кількість повторень/тривалість до цих показників.";
+          "\nConsider these stats when generating physical quests (Strength, Agility, Stamina) to make them challenging but achievable. For example, if the player indicated 0 pull-ups, do not give a pull-up quest, but suggest preparatory exercises (e.g., Australian pull-ups, negatives, or back/arm strengthening exercises). Adapt the number of reps/duration to these stats.";
     }
 
     String targetStatFocusPrompt = "";
     if (targetStat != null) {
       targetStatFocusPrompt = """
 
-ЗАВДАННЯ СПЕЦІАЛЬНО ДЛЯ РОЗВИТКУ ХАРАКТЕРИСТИКИ: ${PlayerModel.getStatName(targetStat)}.
-ПОТОЧНЕ ЗНАЧЕННЯ ЦІЄЇ ХАРАКТЕРИСТИКИ У ГРАВЦЯ: ${player.stats[targetStat] ?? 'N/A'}.
-Адаптуй складність, опис та тип активності відповідно до цього значення та назви характеристики.
-Наприклад, для Інтелекту це може бути читання, вивчення, розв'язування задач. Для Спритності - вправи на координацію, швидкість.
-Для Сприйняття - завдання на уважність, спостережливість. Для Витривалості - кардіо. Для Сили - силові вправи.
-Якщо значення характеристики низьке (наприклад, 1-5 для статів, які починаються з 5), завдання має бути для початківців.
-Якщо високе (наприклад, 15+), завдання може бути більш просунутим.
-Нагорода XP та складність (Ранг) також мають відображати це.
+QUEST SPECIFICALLY FOCUSED ON DEVELOPING STAT: ${PlayerModel.getStatName(targetStat)}.
+CURRENT PLAYER VALUE FOR THIS STAT: ${player.stats[targetStat] ?? 'N/A'}.
+Adapt the complexity, description, and type of activity according to this value and stat name.
+For example, for Intelligence, it could be reading, studying, solving puzzles. For Agility - coordination or speed exercises.
+For Perception - mindfulness or observation tasks. For Stamina - cardio. For Strength - strength exercises.
+If the stat value is low (e.g., 1-5 for stats starting at 5), the quest should be for beginners.
+If high (e.g., 15+), the quest can be more advanced.
+XP reward and Difficulty (Rank) should also reflect this.
 """;
     }
 
     String hpCostInstruction = "";
-    if (questType !=
-            QuestType
-                .daily && // Не застосовуємо вартість HP до щоденних завдань для простоти
+    if (questType != QuestType.daily &&
         (targetStat == PlayerStat.strength ||
             targetStat == PlayerStat.stamina ||
             targetStat == PlayerStat.agility ||
             (customPromptInstruction != null &&
-                (customPromptInstruction.toLowerCase().contains("фізичн") ||
+                (customPromptInstruction.toLowerCase().contains("physical") ||
                     customPromptInstruction
                         .toLowerCase()
-                        .contains("тренуван"))))) {
+                        .contains("training"))))) {
       hpCostInstruction = """
 
-Додаткова інструкція щодо HP:
-Якщо це завдання є фізично складним або вимагає значних зусиль (наприклад, інтенсивне тренування, подолання фізичних перешкод, бій з уявним супротивником), і його ранг складності D або вище, АБО якщо ранг завдання вищий за поточний Ранг Мисливця ($playerRankName), ти МОЖЕШ (але не зобов'язаний, роби це для приблизно 20-30% таких завдань) додати невелику "вартість здоров'я за зусилля".
-Якщо додаєш вартість здоров'я, включи в JSON відповідь поле:
-"hpCostOnCompletion": integer (наприклад, від 3 до ${(player.maxHp * 0.1).round().clamp(5, 20)}, тобто не більше 10% від максимального HP гравця, але в розумних межах 5-20)
-Це значення буде віднято від HP гравця ПІСЛЯ успішного виконання завдання. В описі завдання це згадувати не потрібно, це буде системний ефект. Якщо вартості здоров'я немає, не додавай це поле або встанови null.
-Уникай додавання hpCostOnCompletion для завдань типу "Щоденне".
+Additional instruction regarding HP:
+If this quest is physically demanding or requires significant effort (e.g., intense training, overcoming physical obstacles, fighting an imaginary opponent), AND its difficulty rank is D or higher, OR if the quest rank is higher than the current Hunter Rank ($playerRankName), you MAY (but are not required to, do this for about 20-30% of such quests) add a small "health cost for effort".
+If you add a health cost, include the field in the JSON response:
+"hpCostOnCompletion": integer (e.g., from 3 to ${(player.maxHp * 0.1).round().clamp(5, 20)}, i.e., not more than 10% of player's max HP, but within reasonable limits 5-20)
+This value will be deducted from the player's HP AFTER successful quest completion. Do not mention this in the quest description, it will be a system effect. If there is no health cost, do not add this field or set it to null.
+Avoid adding hpCostOnCompletion for "Daily" type quests.
 """;
     }
 
     String itemRewardsInstruction = "";
     if (availableItemIds.isNotEmpty) {
-      // Перетворюємо список ID в рядок для промпту
       final itemIdsString = availableItemIds.join(', ');
 
       itemRewardsInstruction = """
 
-Додаткова інструкція щодо нагород-предметів:
-Для деяких квестів (приблизно 15-20% випадків), особливо складних, ти можеш додати нагороду у вигляді предмету.
-Якщо додаєш предмет, включи в JSON відповідь поле:
+Additional instruction regarding item rewards:
+For some quests (approximately 15-20% of cases), especially difficult ones, you can add an item reward.
+If you add an item, include the field in the JSON response:
 "itemRewards": [ { "itemId": "string", "quantity": integer } ]
-ВАЖЛИВО: Значення для "itemId" має бути ОБОВ'ЯЗКОВО обрано з наступного списку валідних ID: [$itemIdsString].
-Не вигадуй власні itemId.
-Приклад: "itemRewards": [ { "itemId": "${availableItemIds.first}", "quantity": 1 } ]
-Якщо нагороди у вигляді предметів немає, не додавай це поле або встанови null.
+IMPORTANT: The value for "itemId" MUST be chosen from the following list of valid IDs: [$itemIdsString].
+Do not invent your own itemId.
+Example: "itemRewards": [ { "itemId": "${availableItemIds.first}", "quantity": 1 } ]
+If there are no item rewards, do not add this field or set it to null.
 """;
     }
 
     final prompt = """
-Згенеруй ігрове завдання для рольової гри на Android в стилі аніме "Solo Leveling" (Підняття рівня наодинці).
-Завдання має бути реалістичним для виконання в реальному житті, але описане в термінах ігрового світу.
-Фокусуйся на саморозвитку, фізичних або інтелектуальних вправах, дослідженні або корисних звичках.
+Generate a game quest for an Android RPG in the style of the anime "Solo Leveling".
+The quest should be realistic to perform in real life but described in game world terms.
+Focus on self-improvement, physical or intellectual exercises, exploration, or useful habits.
 
-Інформація про гравця:
-Ім'я: $playerName
-Рівень: ${player.level}
-Ранг Мисливця: $playerRankName 
-Сила: ${player.stats[PlayerStat.strength]}
-Спритність: ${player.stats[PlayerStat.agility]}
-Інтелект: ${player.stats[PlayerStat.intelligence]}
-Сприйняття: ${player.stats[PlayerStat.perception]}
-Витривалість: ${player.stats[PlayerStat.stamina]}
+Player Information:
+Name: $playerName
+Level: ${player.level}
+Hunter Rank: $playerRankName 
+Strength: ${player.stats[PlayerStat.strength]}
+Agility: ${player.stats[PlayerStat.agility]}
+Intelligence: ${player.stats[PlayerStat.intelligence]}
+Perception: ${player.stats[PlayerStat.perception]}
+Stamina: ${player.stats[PlayerStat.stamina]}
 $baselinePerformancePrompt
 
-Параметри для генерації завдання:
-Тип завдання: ${QuestModel.getQuestTypeName(questType)}
-${customPromptInstruction != null ? '\nДодаткова інструкція: $customPromptInstruction' : ''}
+Parameters for quest generation:
+Quest Type: ${QuestModel.getQuestTypeName(questType)}
+${customPromptInstruction != null ? '\nAdditional instruction: $customPromptInstruction' : ''}
 $targetStatFocusPrompt 
 $hpCostInstruction
-Завдання повинно бути унікальним та цікавим.
-Воно повинно містити:
-1.  Назва (коротка, інтригуюча, в стилі Solo Leveling, 3-5 слів).
-2.  Опис (детальніше, що потрібно зробити гравцю, 2-4 речення. Опис має бути практичним, що гравець може зробити в реальності).
-3.  Ранг складності (F, E, D, C, B, A, S). Цей ранг має ВІДПОВІДАТИ $playerRankName рангу гравця.
-4.  Нагорода XP (ціле число). Адаптуй до рівня гравця та рангу завдання.
-    Приклади XP для рівня ${player.level} та рангу $playerRankName:
-    - Ранг F: ${10 + player.level * 2}-${20 + player.level * 3} XP (якщо гравець F рангу)
-    - Ранг E: ${20 + player.level * 3}-${35 + player.level * 4} XP (якщо гравець E рангу)
-    - Ранг D: ${35 + player.level * 4}-${50 + player.level * 5} XP (якщо гравець D рангу)
-    - Ранг C: ${50 + player.level * 5}-${75 + player.level * 6} XP (якщо гравець C рангу)
-    Якщо є фокусна характеристика (targetStat) і її значення у гравця високе, XP може бути трохи більшим для відповідного рангу. Якщо низьке - трохи меншим.
-5.  Фокусна характеристика (опціонально, але ОБОВ'ЯЗКОВО якщо передано targetStat для генерації): назва характеристики (strength, agility, intelligence, perception, stamina), на яку завдання має найбільший вплив. Має збігатися з переданим targetStat, якщо він був.
+The quest must be unique and interesting.
+It must contain:
+1.  Title (short, intriguing, in "Solo Leveling" style, 3-5 words).
+2.  Description (detailed, practical, 2-4 sentences. The description must be practical, something the player can do in reality).
+3.  Difficulty Rank (F, E, D, C, B, A, S). This rank must MATCH the player's rank $playerRankName.
+4.  XP Reward (integer). Adapt to the player's level and quest rank.
+    XP Examples for level ${player.level} and rank $playerRankName:
+    - Rank F: ${10 + player.level * 2}-${20 + player.level * 3} XP (if player is Rank F)
+    - Rank E: ${20 + player.level * 3}-${35 + player.level * 4} XP (if player is Rank E)
+    - Rank D: ${35 + player.level * 4}-${50 + player.level * 5} XP (if player is Rank D)
+    - Rank C: ${50 + player.level * 5}-${75 + player.level * 6} XP (if player is Rank C)
+    If there is a focus stat (targetStat) and the player's value is high, XP can be slightly higher for the corresponding rank. If low - slightly lower.
+5.  Focus Stat (optional, but MANDATORY if targetStat is passed for generation): stat name (strength, agility, intelligence, perception, stamina) that the quest impacts the most. Must match the passed targetStat if it was present.
 
 $itemRewardsInstruction
 
-Надай відповідь ТІЛЬКИ у форматі JSON об'єкту з такими полями (використовуй подвійні лапки для ключів та рядкових значень):
+Provide the response ONLY in valid JSON object format with the following fields (use double quotes for keys and string values):
 "title": "string",
 "description": "string",
 "difficulty": "string (F, E, D, C, B, A, S)",
 "xpReward": integer,
-"targetStat": "stat_name_english" (або null, але має бути заповнено, якщо завдання генерується для конкретного targetStat)
-"hpCostOnCompletion": integer (або null)
-"itemRewards": [ { "itemId": "string", "quantity": integer } ] (або null)
+"targetStat": "stat_name_english" (or null, but must be filled if the quest is generated for a specific targetStat)
+"hpCostOnCompletion": integer (or null)
+"itemRewards": [ { "itemId": "string", "quantity": integer } ] (or null)
 
-Приклад бажаного JSON (не копіюй його, це лише приклад структури):
+Example of desired JSON (do not copy it, this is just a structure example):
 {
-  "title": "Тренування Тіні",
-  "description": "Твій показник віджимань - ${player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] ?? 'невідомий'}. Спробуй виконати 3 підходи по ${((player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] as int? ?? 10) * 0.6).round()} віджимань. Кожен рух має бути чітким.",
+  "title": "Shadow Training",
+  "description": "Your push-up stat is ${player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] ?? 'unknown'}. Try to perform 3 sets of ${((player.baselinePhysicalPerformance?[PhysicalActivity.pushUps] as int? ?? 10) * 0.6).round()} push-ups. Every movement must be precise.",
   "difficulty": "E",
   "xpReward": 30,
   "targetStat": "strength",
   "hpCostOnCompletion": 5
 }
-Переконайся, що назва характеристики в targetStat є однією з: strength, agility, intelligence, perception, stamina.
-Не додавай жодних коментарів або пояснень поза JSON об'єктом. Тільки JSON.
+Ensure that the stat name in targetStat is one of: strength, agility, intelligence, perception, stamina.
+Do not add any comments or explanations outside the JSON object. Only JSON.
 """;
     // print("--- PROMPT ---");
     // print(prompt);
@@ -275,7 +272,7 @@ $itemRewardsInstruction
           },
           severity: CloudLogSeverity.warning,
         );
-        difficulty = player.playerRank; // Якщо Gemini не надав ранг
+        difficulty = player.playerRank;
       }
 
       Map<PlayerStat, int>? statRewards;
