@@ -55,7 +55,7 @@ class QuestModel {
       case QuestType.story:
         return "Story";
       case QuestType.rankUpChallenge:
-        return "RankUpChallenge";
+        return "Rank Up Challenge";
     }
   }
 
