@@ -45,13 +45,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showLatestSystemMessage() {
     final systemLogProvider = context.read<SystemLogProvider>();
-    final message = systemLogProvider
-        .latestMessageForSnackbar; // Це скине повідомлення в провайдері
+    final message = systemLogProvider.latestMessageForSnackbar;
     if (message != null && mounted) {
-      // Відкладаємо показ SnackBar, щоб уникнути помилок під час build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          // Перевіряємо ще раз
           showSystemSnackBar(context, message);
         }
       });
@@ -69,22 +66,22 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.person_search_outlined),
             activeIcon: Icon(Icons.person_search),
-            label: 'Статус',
+            label: 'Status',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.list_alt_outlined),
             activeIcon: Icon(Icons.list_alt),
-            label: 'Завдання',
+            label: 'Quests',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.star_purple500_outlined),
             activeIcon: Icon(Icons.star_purple500),
-            label: 'Навички',
+            label: 'Skills',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.inventory_2_outlined),
             activeIcon: Icon(Icons.inventory_2),
-            label: 'Інвентар',
+            label: 'Inventory',
           ),
         ],
         currentIndex: _selectedIndex,

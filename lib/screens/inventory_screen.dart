@@ -18,7 +18,7 @@ class InventoryScreen extends StatelessWidget {
 
     if (playerProvider.isLoading || itemProvider.isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Інвентар')),
+        appBar: AppBar(title: const Text('Inventory')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -31,7 +31,7 @@ class InventoryScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Інвентар'),
+        title: const Text('Inventory'),
         actions: [
           IconButton(
             icon: Icon(themeProvider.themeMode == ThemeMode.dark
@@ -44,7 +44,7 @@ class InventoryScreen extends StatelessWidget {
         ],
       ),
       body: inventoryItems.isEmpty
-          ? const Center(child: Text('Ваш інвентар порожній.'))
+          ? const Center(child: Text('Inventory is empty.'))
           : GridView.builder(
               padding: const EdgeInsets.all(12.0),
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -77,7 +77,6 @@ class InventorySlot extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Показати діалог з деталями та кнопкою "Використати"
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -86,10 +85,9 @@ class InventorySlot extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Тут можна буде додати іконку
                 Text(item.description),
                 const SizedBox(height: 10),
-                Text('Кількість: ${item.quantity}'),
+                Text('Quantity: ${item.quantity}'),
               ],
             ),
             actions: [
@@ -99,11 +97,11 @@ class InventorySlot extends StatelessWidget {
                     onUse();
                     Navigator.of(ctx).pop();
                   },
-                  child: const Text('Використати'),
+                  child: const Text('Use'),
                 ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Закрити'),
+                child: const Text('Close'),
               ),
             ],
           ),

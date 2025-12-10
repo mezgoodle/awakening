@@ -20,20 +20,16 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Викликаємо асинхронну функцію ініціалізації
     _initialize();
   }
 
   Future<void> _initialize() async {
-    // Відкладаємо виконання до завершення першого кадру, щоб контекст був повністю готовий
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
     try {
-      // 1. Автентифікація
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        // Якщо користувач не увійшов, виконуємо анонімний вхід
         final userCredential = await FirebaseAuth.instance.signInAnonymously();
         user = userCredential.user;
         _logger.writeLog(
@@ -67,7 +63,6 @@ class _SplashScreenState extends State<SplashScreen> {
           _navigate();
         }
       } else {
-        // Обробка помилки входу
         _showErrorAndStay();
       }
     } catch (e) {
@@ -97,13 +92,12 @@ class _SplashScreenState extends State<SplashScreen> {
   void _showErrorAndStay() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content:
-            Text("Помилка автентифікації. Перевірте інтернет-з'єднання.")));
+        content: Text(
+            "Authentication error. Please check your internet connection.")));
   }
 
   @override
   void dispose() {
-    // Переконуємося, що відписуємося
     if (context.mounted) {
       context.read<PlayerProvider>().removeListener(_onPlayerProviderLoaded);
     }
@@ -123,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              'Автентифікація та завантаження...',
+              'Authenticating and loading...',
               style: TextStyle(fontSize: 16, color: Colors.white70),
             ),
           ],

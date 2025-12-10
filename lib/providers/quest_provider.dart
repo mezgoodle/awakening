@@ -119,7 +119,7 @@ class QuestProvider with ChangeNotifier {
 
     _activeQuests.insert(0, quest);
     notifyListeners();
-    slog.addMessage("Нове завдання: '${quest.title}'", MessageType.questAdded,
+    slog.addMessage("New quest: '${quest.title}'", MessageType.questAdded,
         showInSnackbar: showSnackbar);
 
     try {
@@ -143,8 +143,7 @@ class QuestProvider with ChangeNotifier {
           "error": e.toString()
         },
       );
-      slog.addMessage(
-          "Помилка збереження завдання '${quest.title}'", MessageType.error);
+      slog.addMessage("Error adding quest '${quest.title}'", MessageType.error);
       _activeQuests.removeWhere((q) => q.id == quest.id);
       notifyListeners();
     }
@@ -174,7 +173,7 @@ class QuestProvider with ChangeNotifier {
           if (itemId != null && quantity != null && quantity > 0) {
             playerProvider.addItemToInventory(itemId, quantity);
             slog.addMessage(
-                "Отримано предмет: $itemId (x$quantity)", MessageType.info,
+                "Received item: $itemId (x$quantity)", MessageType.info,
                 showInSnackbar: true);
           }
         }
@@ -183,7 +182,7 @@ class QuestProvider with ChangeNotifier {
       if (quest.hpCostOnCompletion != null && quest.hpCostOnCompletion! > 0) {
         playerProvider.takePlayerDamage(quest.hpCostOnCompletion!);
         slog.addMessage(
-            "Ви доклали значних зусиль! Втрачено ${quest.hpCostOnCompletion} HP.",
+            "You have made many efforts! Lost ${quest.hpCostOnCompletion} HP.",
             MessageType.warning);
       }
 
@@ -198,7 +197,7 @@ class QuestProvider with ChangeNotifier {
             playerProvider.awardNewRank(awardedRank, slog);
           } else {
             slog.addMessage(
-                "Неможливо присвоїти ранг ${QuestModel.getQuestDifficultyName(awardedRank)}, він вищий за максимально доступний за рівнем.",
+                "Cannot award rank ${QuestModel.getQuestDifficultyName(awardedRank)}, it is higher than the maximum available rank.",
                 MessageType.warning);
           }
         }

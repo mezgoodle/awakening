@@ -1,4 +1,3 @@
-// lib/screens/quests_screen.dart
 import 'package:awakening/models/player_model.dart';
 import 'package:awakening/providers/item_provider.dart';
 import 'package:awakening/providers/system_log_provider.dart';
@@ -26,13 +25,6 @@ class _QuestsScreenState extends State<QuestsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-
-    // Можна викликати generateDailyQuestsIfNeeded тут, якщо ще не викликали в HomeScreen
-    // або якщо хочемо оновлювати при кожному відкритті вкладки (не дуже добре для щоденних)
-    // final playerProvider = context.read<PlayerProvider>();
-    // if (!playerProvider.isLoading) {
-    //   context.read<QuestProvider>().generateDailyQuestsIfNeeded(playerProvider);
-    // }
   }
 
   @override
@@ -41,15 +33,13 @@ class _QuestsScreenState extends State<QuestsScreen>
     super.dispose();
   }
 
-  // Функція для показу діалогу вибору параметрів генерації
   Future<Map<String, dynamic>?> _showQuestGenerationOptionsDialog(
       BuildContext context) async {
-    PlayerStat? selectedStat; // Початкове значення - не обрано
-    // Створюємо список опцій для Dropdown, включаючи "Будь-яка"
+    PlayerStat? selectedStat;
     final List<DropdownMenuItem<PlayerStat?>> statItems = [
       const DropdownMenuItem<PlayerStat?>(
-        value: null, // null означає "Будь-яка" / "Загальний розвиток"
-        child: Text('Будь-яка / Загальний'),
+        value: null,
+        child: Text('Any / General'),
       ),
       ...PlayerStat.values.map((PlayerStat stat) {
         return DropdownMenuItem<PlayerStat?>(
@@ -58,63 +48,47 @@ class _QuestsScreenState extends State<QuestsScreen>
         );
       }).toList(),
     ];
-    // Можна додати TextEditingController для кастомної інструкції пізніше
-    // final TextEditingController instructionController = TextEditingController();
 
     return showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (BuildContext dialogContext) {
-        // Використовуємо StatefulWidget для Dropdown всередині AlertDialog, щоб він оновлювався
         return StatefulBuilder(builder: (context, setStateDialog) {
           return AlertDialog(
-            title: const Text('Параметри генерації завдання'),
+            title: const Text('Quest Generation Options'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   DropdownButtonFormField<PlayerStat?>(
                     decoration: const InputDecoration(
-                      labelText: 'Фокусна характеристика',
+                      labelText: 'Focus Stat',
                       border: OutlineInputBorder(),
                     ),
                     value: selectedStat,
                     items: statItems,
                     onChanged: (PlayerStat? newValue) {
                       setStateDialog(() {
-                        // Оновлюємо стан діалогу
                         selectedStat = newValue;
                       });
                     },
-                    hint: const Text('Оберіть характеристику (необов\'язково)'),
+                    hint: const Text('Select stat (optional)'),
                   ),
                   const SizedBox(height: 20),
-                  // Тут можна буде додати поле для кастомної інструкції
-                  // TextFormField(
-                  //   controller: instructionController,
-                  //   decoration: const InputDecoration(
-                  //     labelText: 'Додаткова інструкція (опціонально)',
-                  //     hintText: 'Наприклад: "завдання на відкритому повітрі"',
-                  //     border: OutlineInputBorder(),
-                  //   ),
-                  //   maxLines: 2,
-                  // ),
                 ],
               ),
             ),
             actions: <Widget>[
               TextButton(
-                child: const Text('Скасувати'),
+                child: const Text('Cancel'),
                 onPressed: () {
-                  Navigator.of(dialogContext)
-                      .pop(null); // Повертаємо null при скасуванні
+                  Navigator.of(dialogContext).pop(null);
                 },
               ),
               ElevatedButton(
-                child: const Text('Згенерувати'),
+                child: const Text('Generate'),
                 onPressed: () {
                   Navigator.of(dialogContext).pop({
                     'targetStat': selectedStat,
-                    // 'customInstruction': instructionController.text.trim(),
                   });
                 },
               ),
@@ -132,28 +106,26 @@ class _QuestsScreenState extends State<QuestsScreen>
     if (playerProvider.isLoading) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Дані гравця ще завантажуються. Спробуйте пізніше.')),
+            content: Text('Player data is still loading. Please try later.')),
       );
       return;
     }
     if (questProvider.isGeneratingQuest) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Завдання вже генерується... Зачекайте.')),
+        const SnackBar(
+            content: Text('Quest is already generating... Please wait.')),
       );
       return;
     }
 
-    // Показуємо діалог вибору параметрів
     final generationParams = await _showQuestGenerationOptionsDialog(context);
 
     if (generationParams == null) {
-      // Користувач натиснув "Скасувати"
       return;
     }
 
     final PlayerStat? targetStat =
         generationParams['targetStat'] as PlayerStat?;
-    // final String? customInstruction = generationParams['customInstruction'] as String?
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -161,7 +133,7 @@ class _QuestsScreenState extends State<QuestsScreen>
           content: Row(children: [
             CircularProgressIndicator(),
             SizedBox(width: 15),
-            Text('Генерація завдання через Gemini...')
+            Text('Generating quest via Gemini...')
           ])),
     );
     final slog = context.read<SystemLogProvider>();
@@ -177,21 +149,20 @@ class _QuestsScreenState extends State<QuestsScreen>
         );
 
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .hideCurrentSnackBar(); // Ховаємо індикатор завантаження
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       if (generatedQuest != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Нове завдання "${generatedQuest.title}" згенеровано та додано!'),
+                'New quest "${generatedQuest.title}" generated and added!'),
             backgroundColor: Colors.green[700],
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Не вдалося згенерувати завдання. Спробуйте ще раз.'),
+            content: Text('Failed to generate quest. Please try again.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -213,7 +184,7 @@ class _QuestsScreenState extends State<QuestsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Завдання'),
+        title: const Text('Quests'),
         actions: [
           IconButton(
             icon: Icon(themeProvider.themeMode == ThemeMode.dark
@@ -224,9 +195,8 @@ class _QuestsScreenState extends State<QuestsScreen>
             },
           ),
           IconButton(
-            icon:
-                const Icon(Icons.notifications_outlined), // Іконка для журналу
-            tooltip: 'Журнал Системи',
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'System Log',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -234,33 +204,29 @@ class _QuestsScreenState extends State<QuestsScreen>
               );
             },
           ),
-          // Кнопка для генерації щоденних квестів (для тесту)
           Consumer<PlayerProvider>(
-              // Використовуємо Consumer для доступу до PlayerProvider
               builder: (context, playerProviderInstance, child) {
             return IconButton(
               icon: const Icon(Icons.wb_sunny_outlined),
-              tooltip: 'Згенерувати щоденні завдання',
+              tooltip: 'Generate daily quests',
               onPressed: (questProvider.isGeneratingQuest ||
                       playerProviderInstance.isLoading)
                   ? null
                   : () {
                       final slog = context.read<SystemLogProvider>();
-                      // Деактивуємо, якщо щось завантажується
                       questProvider.generateDailyQuestsIfNeeded(
                           playerProviderInstance, slog);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                             content:
-                                Text('Спроба генерації щоденних завдань...')),
+                                Text('Attempting to generate daily quests...')),
                       );
                     },
             );
           }),
-          // Кнопка для скидання всіх квестів (для тесту)
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'Скинути всі завдання (Тест)',
+            tooltip: 'Reset all quests (Test)',
             onPressed: questProvider.isGeneratingQuest
                 ? null
                 : () async {
@@ -268,18 +234,18 @@ class _QuestsScreenState extends State<QuestsScreen>
                       context: context,
                       builder: (BuildContext ctx) {
                         return AlertDialog(
-                          title: const Text('Скинути Завдання?'),
+                          title: const Text('Reset Quests?'),
                           content: const Text(
-                              'Ви впевнені, що хочете скинути всі активні та виконані завдання?'),
+                              'Are you sure you want to reset all active and completed quests?'),
                           actions: <Widget>[
                             TextButton(
-                              child: const Text('Скасувати'),
+                              child: const Text('Cancel'),
                               onPressed: () => Navigator.of(ctx).pop(false),
                             ),
                             TextButton(
                               style: TextButton.styleFrom(
                                   foregroundColor: Colors.red),
-                              child: const Text('Скинути'),
+                              child: const Text('Reset'),
                               onPressed: () => Navigator.of(ctx).pop(true),
                             ),
                           ],
@@ -290,8 +256,7 @@ class _QuestsScreenState extends State<QuestsScreen>
                       await questProvider.resetAllQuests();
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Всі завдання скинуто.')),
+                          const SnackBar(content: Text('All quests reset.')),
                         );
                       }
                     }
@@ -304,8 +269,8 @@ class _QuestsScreenState extends State<QuestsScreen>
           labelColor: Colors.lightBlueAccent,
           unselectedLabelColor: Colors.grey[400],
           tabs: const [
-            Tab(text: 'Активні'),
-            Tab(text: 'Виконані'),
+            Tab(text: 'Active'),
+            Tab(text: 'Completed'),
           ],
         ),
       ),
@@ -318,23 +283,20 @@ class _QuestsScreenState extends State<QuestsScreen>
       ),
       floatingActionButton: _tabController.index == 0
           ? FloatingActionButton.extended(
-              onPressed: questProvider.isGeneratingQuest
-                  ? null
-                  : _generateNewQuest, // Деактивуємо кнопку під час генерації
+              onPressed:
+                  questProvider.isGeneratingQuest ? null : _generateNewQuest,
               label: questProvider.isGeneratingQuest
-                  ? const Text('Генерація...')
-                  : const Text('Нове завдання'),
+                  ? const Text('Generating...')
+                  : const Text('New Quest'),
               icon: questProvider.isGeneratingQuest
                   ? Container(
-                      // Маленький індикатор завантаження
                       width: 20,
                       height: 20,
                       padding: const EdgeInsets.all(2.0),
                       child: const CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.black54),
                     )
-                  : const Icon(
-                      Icons.auto_awesome_outlined), // Іконка для Gemini
+                  : const Icon(Icons.auto_awesome_outlined),
               backgroundColor: questProvider.isGeneratingQuest
                   ? Colors.grey
                   : Theme.of(context).colorScheme.secondaryContainer,
@@ -350,23 +312,20 @@ class _QuestsScreenState extends State<QuestsScreen>
       return Center(
         child: Text(
           isActiveList
-              ? 'Немає активних завдань.\nСпробуйте згенерувати щоденні або додати нове!'
-              : 'Ще немає виконаних завдань.',
+              ? 'No active quests.\nTry generating daily quests or add a new one!'
+              : 'No completed quests yet.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 16),
         ),
       );
     }
 
-    // Сортуємо: щоденні спочатку, потім за складністю (S -> F), потім за датою створення
     quests.sort((a, b) {
       if (a.type == QuestType.daily && b.type != QuestType.daily) return -1;
       if (a.type != QuestType.daily && b.type == QuestType.daily) return 1;
-      int difficultyCompare = b.difficulty.index
-          .compareTo(a.difficulty.index); // S (більший індекс) йде першим
+      int difficultyCompare = b.difficulty.index.compareTo(a.difficulty.index);
       if (difficultyCompare != 0) return difficultyCompare;
-      return (b.createdAt ?? DateTime(0))
-          .compareTo(a.createdAt ?? DateTime(0)); // Новіші спочатку
+      return (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0));
     });
 
     return ListView.builder(
@@ -378,21 +337,20 @@ class _QuestsScreenState extends State<QuestsScreen>
           quest: quest,
           onComplete: isActiveList
               ? () {
-                  // Показати діалог підтвердження
                   showDialog(
                       context: context,
                       builder: (BuildContext ctx) {
                         return AlertDialog(
-                          title: Text('Завершити завдання "${quest.title}"?'),
+                          title: Text('Complete quest "${quest.title}"?'),
                           content: Text(
-                              'Ви дійсно виконали це завдання?\nНагорода: ${quest.xpReward} XP'),
+                              'Have you really completed this quest?\nReward: ${quest.xpReward} XP'),
                           actions: <Widget>[
                             TextButton(
-                              child: const Text('Скасувати'),
+                              child: const Text('Cancel'),
                               onPressed: () => Navigator.of(ctx).pop(),
                             ),
                             ElevatedButton(
-                              child: const Text('Завершити'),
+                              child: const Text('Complete'),
                               onPressed: () {
                                 final slog = context.read<SystemLogProvider>();
                                 context.read<QuestProvider>().completeQuest(
@@ -401,7 +359,7 @@ class _QuestsScreenState extends State<QuestsScreen>
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                       content: Text(
-                                          'Завдання "${quest.title}" виконано!'),
+                                          'Quest "${quest.title}" completed!'),
                                       backgroundColor: Colors.green[700]),
                                 );
                               },
@@ -410,7 +368,7 @@ class _QuestsScreenState extends State<QuestsScreen>
                         );
                       });
                 }
-              : null, // Немає дії для виконаних
+              : null,
         );
       },
     );
