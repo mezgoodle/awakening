@@ -294,7 +294,7 @@ class PlayerProvider with ChangeNotifier {
       _player!.availableStatPoints += 3;
       if (_player!.level % 5 == 0) {
         _player!.availableSkillPoints += 1;
-        slog?.addMessage("Отримано 1 очко навичок!", MessageType.info);
+        slog?.addMessage("Received 1 skill point!", MessageType.info);
       }
       leveledUpThisCheck = true;
     }
@@ -304,12 +304,12 @@ class PlayerProvider with ChangeNotifier {
       _player!.onLevelUp();
       _calculateFinalStats();
 
-      slog?.addMessage("Рівень підвищено! Новий рівень: ${_player!.level}",
-          MessageType.levelUp);
+      slog?.addMessage(
+          "Level up! New level: ${_player!.level}", MessageType.levelUp);
       int pointsGained = _player!.availableStatPoints - oldAvailablePoints;
       if (pointsGained > 0) {
-        slog?.addMessage("Отримано $pointsGained оч. характеристик!",
-            MessageType.statsIncreased);
+        slog?.addMessage(
+            "Received $pointsGained stat points!", MessageType.statsIncreased);
       }
     }
   }
@@ -322,7 +322,7 @@ class PlayerProvider with ChangeNotifier {
 
     if (_player!.learnedSkillIds.contains(skillId)) {
       slog.addMessage(
-          "Навичка '${skill.name}' вже вивчена.", MessageType.warning);
+          "Skill '${skill.name}' is already learned.", MessageType.warning);
       return false;
     }
 
@@ -334,12 +334,12 @@ class PlayerProvider with ChangeNotifier {
         _calculateFinalStats();
       }
 
-      slog.addMessage("Вивчено навичку: '${skill.name}'!", MessageType.levelUp);
+      slog.addMessage("Learned skill: '${skill.name}'!", MessageType.levelUp);
       _savePlayerData();
       notifyListeners();
       return true;
     } else {
-      slog.addMessage("Недостатньо умов для вивчення навички '${skill.name}'.",
+      slog.addMessage("Not enough skill points to learn '${skill.name}'.",
           MessageType.warning);
       return false;
     }
@@ -355,21 +355,21 @@ class PlayerProvider with ChangeNotifier {
 
     if (_player!.activeBuffs.containsKey(skillId)) {
       slog.addMessage(
-          "Ефект '${skill.name}' вже активний.", MessageType.warning);
+          "Skill '${skill.name}' is already active.", MessageType.warning);
       return false;
     }
 
     final cooldownEndTime = _skillCooldowns[skillId];
     if (cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now())) {
       slog.addMessage(
-          "Навичка '${skill.name}' перезаряджається.", MessageType.warning);
+          "Skill '${skill.name}' is on cooldown.", MessageType.warning);
       return false;
     }
 
     final mpCost = skill.mpCost?.toInt() ?? 0;
     if (_player!.currentMp < mpCost) {
       slog.addMessage(
-          "Недостатньо MP для '${skill.name}'.", MessageType.warning);
+          "Not enough MP to activate '${skill.name}'.", MessageType.warning);
       return false;
     }
 
@@ -383,7 +383,7 @@ class PlayerProvider with ChangeNotifier {
       _skillCooldowns[skillId] = DateTime.now().add(skill.cooldown!);
     }
 
-    slog.addMessage("Активовано: '${skill.name}'!", MessageType.info);
+    slog.addMessage("Activated skill: '${skill.name}'!", MessageType.info);
 
     _calculateFinalStats();
     _savePlayerData();
@@ -402,13 +402,13 @@ class PlayerProvider with ChangeNotifier {
         _player!.onStatsChanged();
       }
       slog.addMessage(
-          "${PlayerModel.getStatName(stat)} збільшено на $amountToSpend. Поточне значення: ${_player!.stats[stat]}",
+          "${PlayerModel.getStatName(stat)} increased by $amountToSpend. New value: ${_player!.stats[stat]}",
           MessageType.statsIncreased);
       _savePlayerData();
       notifyListeners();
       return true;
     }
-    slog.addMessage("Недостатньо очок.", MessageType.warning);
+    slog.addMessage("Not enough stat points.", MessageType.warning);
     return false;
   }
 
@@ -422,38 +422,6 @@ class PlayerProvider with ChangeNotifier {
   void updateBaselinePerformance(Map<PhysicalActivity, dynamic> performance) {
     if (_isLoading) return;
     _player!.baselinePhysicalPerformance = Map.from(performance);
-    _savePlayerData();
-    notifyListeners();
-  }
-
-  void applyInitialStatBonuses(Map<PlayerStat, int> bonuses) {
-    if (_isLoading || _player!.initialSurveyCompleted) {
-      if (_player!.initialSurveyCompleted) {
-        return;
-      }
-    }
-
-    bool statsAffectingHpMpChanged = false;
-    bonuses.forEach((stat, bonusAmount) {
-      if (bonusAmount > 0) {
-        _player!.stats[stat] = (_player!.stats[stat] ?? 0) + bonusAmount;
-        if (stat == PlayerStat.stamina || stat == PlayerStat.intelligence) {
-          statsAffectingHpMpChanged = true;
-        }
-      }
-    });
-
-    if (statsAffectingHpMpChanged) {
-      _player!.onStatsChanged();
-    }
-
-    _savePlayerData();
-    notifyListeners();
-  }
-
-  void setInitialSurveyCompleted(bool completed) {
-    if (_isLoading) return;
-    _player!.initialSurveyCompleted = completed;
     _savePlayerData();
     notifyListeners();
   }
@@ -526,11 +494,10 @@ class PlayerProvider with ChangeNotifier {
     if (_player!.playerRank.index < newRank.index) {
       _player!.playerRank = newRank;
       slog.addMessage(
-          "Ранг Мисливця підвищено! Новий ранг: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
+          "Rank up! New rank: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
           MessageType.rankUp);
       _savePlayerData();
       notifyListeners();
-      // _checkForAvailableRankUpChallenge(); // Перевіряємо, чи доступний наступний ранг-ап
     }
   }
 
@@ -552,13 +519,13 @@ class PlayerProvider with ChangeNotifier {
 
       if (targetRankForChallenge.index > nextPotentialRankByLevel.index) {
         slog.addMessage(
-            "Рівень ${player.level} недостатній для випробування на ранг ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}.",
+            "Level ${player.level} is not enough for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}.",
             MessageType.info);
         return false;
       }
 
       slog.addMessage(
-          "Запит на Випробування на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг...",
+          "Requesting rank up challenge for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Rank...",
           MessageType.info);
 
       if (_itemProvider != null) {
@@ -568,7 +535,7 @@ class PlayerProvider with ChangeNotifier {
             slog: slog,
             questType: QuestType.rankUpChallenge,
             customInstruction:
-                "Це дуже важливе Рангове Випробування для гравця ${playerProvider.player.playerName} (Рівень: ${playerProvider.player.level}, Поточний Ранг: ${QuestModel.getQuestDifficultyName(currentRank)}) для переходу на ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Ранг. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
+                "It is very important Rank challenge for ${playerProvider.player.playerName} (Level: ${playerProvider.player.level}, Current Rank: ${QuestModel.getQuestDifficultyName(currentRank)}) to ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Rank. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
         return true;
       } else {
         slog.addMessage("ItemProvider недоступний для створення квесту.",

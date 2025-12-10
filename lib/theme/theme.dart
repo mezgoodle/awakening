@@ -18,11 +18,10 @@ class AppTheme {
       titleLarge:
           TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
       titleMedium: TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
-      headlineSmall: TextStyle(
-          color: Colors.black, fontWeight: FontWeight.bold), // для заголовків
+      headlineSmall:
+          TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
     ),
     radioTheme: RadioThemeData(
-      // Стилізація радіокнопок
       fillColor:
           WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
         if (states.contains(WidgetState.selected)) {

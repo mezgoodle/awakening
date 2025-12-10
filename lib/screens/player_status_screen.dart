@@ -26,7 +26,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'РІВЕНЬ ПІДВИЩЕНО! Вітаємо, Мисливець!',
+          'Level up!',
           style: TextStyle(
               color: Theme.of(context).colorScheme.onSecondaryContainer),
         ),
@@ -36,35 +36,30 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     );
   }
 
-  // Функція для показу діалогу редагування імені
   Future<void> _showEditNameDialog(
       BuildContext context, PlayerProvider playerProvider) async {
     final TextEditingController nameController =
         TextEditingController(text: playerProvider.player.playerName);
-    final formKey = GlobalKey<FormState>(); // Для валідації
-
+    final formKey = GlobalKey<FormState>();
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // Користувач має натиснути кнопку
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Змінити ім\'я гравця'),
+          title: const Text('Change player name'),
           content: SingleChildScrollView(
-            // На випадок, якщо екран малий
             child: Form(
               key: formKey,
               child: TextFormField(
                 controller: nameController,
                 autofocus: true,
-                decoration:
-                    const InputDecoration(hintText: "Введіть нове ім'я"),
+                decoration: const InputDecoration(hintText: "Enter new name"),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Ім\'я не може бути порожнім';
+                    return 'Name cannot be empty';
                   }
                   if (value.trim().length > 20) {
-                    // Обмеження довжини
-                    return 'Ім\'я занадто довге (макс. 20 символів)';
+                    return 'Name is too long (max. 20 characters)';
                   }
                   return null;
                 },
@@ -73,19 +68,19 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text('Скасувати'),
+              child: const Text('Cancel'),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
             ),
             ElevatedButton(
-              child: const Text('Зберегти'),
+              child: const Text('Save'),
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   playerProvider.setPlayerName(nameController.text.trim());
                   Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ім\'я гравця оновлено!')),
+                    const SnackBar(content: Text('Player name updated!')),
                   );
                 }
               },
@@ -134,15 +129,13 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
         ),
         const SizedBox(height: 5),
         Container(
-          // Контейнер для рамки прогрес-бару
-          height: 12, // Висота бару
+          height: 12,
           decoration: BoxDecoration(
-            color: Colors.grey[800], // Фон бару
+            color: Colors.grey[800],
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: Colors.grey[700]!, width: 1),
           ),
           child: FractionallySizedBox(
-            // Для заповнення частини бару
             widthFactor: percentage,
             alignment: Alignment.centerLeft,
             child: Container(
@@ -172,7 +165,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     if (playerProvider.isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Статус Гравця'),
+          title: const Text('Player Status'),
         ),
         body: const Center(
           child: CircularProgressIndicator(),
@@ -196,7 +189,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Статус Гравця'),
+        title: const Text('Player Status'),
         actions: [
           IconButton(
             icon: Icon(themeProvider.themeMode == ThemeMode.dark
@@ -208,7 +201,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Журнал Системи',
+            tooltip: 'System Log',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -218,19 +211,18 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Скинути прогрес (Тест)',
+            tooltip: 'Reset Progress(Test)',
             onPressed: () async {
-              // Запитуємо підтвердження перед скиданням
               bool? confirmReset = await showDialog<bool>(
                 context: context,
                 builder: (BuildContext context) {
                   return AlertDialog(
-                    title: const Text('Скинути Прогрес?'),
+                    title: const Text('Reset Progress(Test)?'),
                     content: const Text(
-                        'Ви впевнені, що хочете скинути весь прогрес гравця? Цю дію неможливо буде скасувати.'),
+                        'Are you sure you want to reset the player progress? This action cannot be undone.'),
                     actions: <Widget>[
                       TextButton(
-                        child: const Text('Скасувати'),
+                        child: const Text('Cancel'),
                         onPressed: () {
                           Navigator.of(context).pop(false);
                         },
@@ -238,7 +230,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                       TextButton(
                         style:
                             TextButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text('Скинути'),
+                        child: const Text('Reset'),
                         onPressed: () {
                           Navigator.of(context).pop(true);
                         },
@@ -251,7 +243,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 await playerProvider.resetPlayerData();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Прогрес гравця скинуто.')),
+                    const SnackBar(content: Text('Player progress reset.')),
                   );
                 }
               }
@@ -264,15 +256,14 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
         child: ListView(
           children: <Widget>[
             _buildInfoCard(
-              'Ім\'я Гравця:',
+              'Player Name:',
               player.playerName,
               actionWidget: IconButton(
-                // Додаємо кнопку редагування
                 icon: const Icon(
                   Icons.edit_outlined,
                   size: 20,
                 ),
-                tooltip: 'Редагувати ім\'я',
+                tooltip: 'Edit Name',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () {
@@ -288,7 +279,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: <Widget>[
-                    const Text("Ранг Мисливця:",
+                    const Text("Hunter Rank:",
                         style: TextStyle(
                           fontSize: 16,
                         )),
@@ -303,8 +294,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                               color: _getRankColor(player.playerRank, context),
                               width: 1.5)),
                       child: Text(
-                        QuestModel.getQuestDifficultyName(player
-                            .playerRank), // Використовуємо той самий метод
+                        QuestModel.getQuestDifficultyName(player.playerRank),
                         style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -315,7 +305,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 ),
               ),
             ),
-            _buildInfoCard('Рівень:', '${player.level}'),
+            _buildInfoCard('Level:', '${player.level}'),
             const SizedBox(height: 16),
             _buildActiveBuffsSection(player),
             const SizedBox(height: 16),
@@ -326,7 +316,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 Colors.blueAccent[400]!, Icons.flash_on_rounded),
             const SizedBox(height: 20),
             Text(
-              'Досвід: ${player.xp} / ${player.xpToNextLevel}',
+              'XP: ${player.xp} / ${player.xpToNextLevel}',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 4),
@@ -338,14 +328,14 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Характеристики:',
+              'Stats:',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             if (player.availableStatPoints > 0)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Text(
-                  'Доступні очки для розподілу: ${player.availableStatPoints}',
+                  'Available Stat Points: ${player.availableStatPoints}',
                   style: TextStyle(
                       color: Colors.lightBlueAccent[100], fontSize: 16),
                   textAlign: TextAlign.center,
@@ -375,7 +365,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.workspace_premium_outlined),
                   label: Text(
-                      'Запросити Випробування на ${QuestModel.getQuestDifficultyName(QuestDifficulty.values[player.playerRank.index + 1])}-Ранг'),
+                      'Challenge for ${QuestModel.getQuestDifficultyName(QuestDifficulty.values[player.playerRank.index + 1])}-Ранг'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple[400],
                     padding: const EdgeInsets.symmetric(vertical: 15),
@@ -388,24 +378,20 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                                   questProvider,
                                   systemLogProvider,
                                   playerProvider);
-                          if (requested && context.mounted) {
-                            // Повідомлення про запит вже є в requestRankUpChallenge
-                            // Можна оновити екран, щоб кнопка зникла, якщо квест додано
-                          }
+                          if (requested && context.mounted) {}
                         },
                 ),
               ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    Colors.amberAccent, // Змінимо колір для різноманітності
+                backgroundColor: Colors.amberAccent,
                 foregroundColor: Colors.black,
               ),
               onPressed: () {
                 final slog = context.read<SystemLogProvider>();
-                playerProvider.addXp(250, slog); // Додаємо 50 XP для тесту
+                playerProvider.addXp(250, slog);
               },
-              child: const Text('Додати 250 XP (Тест)'),
+              child: const Text('Add 250 XP(Test)'),
             ),
           ],
         ),
@@ -432,7 +418,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Активні Ефекти:',
+            'Active Buffs:',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8.0),
@@ -461,7 +447,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
               ),
             ),
             Row(
-              // Об'єднуємо значення та екшн-віджет
               children: [
                 Text(
                   value,
@@ -471,7 +456,6 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                   ),
                 ),
                 if (actionWidget != null) ...[
-                  // Якщо є actionWidget
                   const SizedBox(width: 8),
                   actionWidget,
                 ]
@@ -519,7 +503,7 @@ class _PlayerStatusScreenState extends State<PlayerStatusScreen> {
                     iconSize: 20,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    tooltip: 'Збільшити ${statName.toLowerCase()}',
+                    tooltip: 'Increase ${statName.toLowerCase()}',
                     onPressed: onIncrease,
                   ),
                 ),

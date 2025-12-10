@@ -1,4 +1,3 @@
-// lib/screens/system_log_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -54,35 +53,33 @@ class SystemLogScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final systemLogProvider = context.watch<SystemLogProvider>();
-    final messages = systemLogProvider
-        .messages; // Список вже відсортований (найновіші спочатку)
+    final messages = systemLogProvider.messages;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Журнал Системи'),
+        title: const Text('System Log'),
         actions: [
-          if (messages
-              .isNotEmpty) // Показувати кнопку, тільки якщо є що очищати
+          if (messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
-              tooltip: 'Очистити журнал',
+              tooltip: 'Clear log',
               onPressed: () async {
                 bool? confirmClear = await showDialog<bool>(
                   context: context,
                   builder: (BuildContext ctx) {
                     return AlertDialog(
-                      title: const Text('Очистити Журнал?'),
+                      title: const Text('Clear Log?'),
                       content: const Text(
-                          'Ви впевнені, що хочете видалити всі системні повідомлення?'),
+                          'Are you sure you want to delete all system messages?'),
                       actions: <Widget>[
                         TextButton(
-                          child: const Text('Скасувати'),
+                          child: const Text('Cancel'),
                           onPressed: () => Navigator.of(ctx).pop(false),
                         ),
                         TextButton(
                           style:
                               TextButton.styleFrom(foregroundColor: Colors.red),
-                          child: const Text('Очистити'),
+                          child: const Text('Clear'),
                           onPressed: () => Navigator.of(ctx).pop(true),
                         ),
                       ],
@@ -92,9 +89,8 @@ class SystemLogScreen extends StatelessWidget {
                 if (confirmClear == true) {
                   await systemLogProvider.clearLog();
                   if (context.mounted) {
-                    // Перевірка mounted після асинхронного виклику
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Журнал системи очищено.')),
+                      const SnackBar(content: Text('System log cleared.')),
                     );
                   }
                 }
@@ -105,7 +101,7 @@ class SystemLogScreen extends StatelessWidget {
       body: messages.isEmpty
           ? Center(
               child: Text(
-                'Журнал системних повідомлень порожній.',
+                'System message log is empty.',
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
@@ -121,7 +117,7 @@ class SystemLogScreen extends StatelessWidget {
                 final iconColor =
                     _getColorForMessageType(message.type, context);
                 return Card(
-                  elevation: 1, // Невелика тінь для карток
+                  elevation: 1,
                   margin:
                       const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0),
                   shape: RoundedRectangleBorder(
@@ -136,9 +132,10 @@ class SystemLogScreen extends StatelessWidget {
                       size: 28,
                     ),
                     title: Text(message.text,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            // fontWeight: message.isRead ? FontWeight.normal : FontWeight.bold, // Для відмітки прочитаних
-                            fontSize: 15)),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge
+                            ?.copyWith(fontSize: 15)),
                     subtitle: Text(
                       DateFormat('dd.MM.yyyy HH:mm:ss')
                           .format(message.timestamp),
@@ -147,15 +144,10 @@ class SystemLogScreen extends StatelessWidget {
                           .bodySmall
                           ?.copyWith(fontSize: 12, color: Colors.grey[500]),
                     ),
-                    // Можна додати onTap для позначки як прочитане або для якихось дій
-                    // onTap: () {
-                    //   // systemLogProvider.markAsRead(message.id);
-                    // },
                   ),
                 );
               },
-              separatorBuilder: (context, index) =>
-                  const SizedBox(height: 2), // Невеликий розділювач
+              separatorBuilder: (context, index) => const SizedBox(height: 2),
             ),
     );
   }

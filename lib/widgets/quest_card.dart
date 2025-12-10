@@ -1,11 +1,10 @@
-// lib/widgets/quest_card.dart
 import 'package:flutter/material.dart';
 import '../models/quest_model.dart';
-import '../models/player_model.dart'; // Для PlayerModel.getStatName
+import '../models/player_model.dart';
 
 class QuestCard extends StatelessWidget {
   final QuestModel quest;
-  final VoidCallback? onComplete; // Кнопка "Виконати" буде тільки для активних
+  final VoidCallback? onComplete;
 
   const QuestCard({
     super.key,
@@ -13,7 +12,6 @@ class QuestCard extends StatelessWidget {
     this.onComplete,
   });
 
-  // Колір для рамки/іконки залежно від складності
   Color _getDifficultyColor(QuestDifficulty difficulty, BuildContext context) {
     switch (difficulty) {
       case QuestDifficulty.S:
@@ -42,7 +40,7 @@ class QuestCard extends StatelessWidget {
       case QuestType.milestone:
         return Icons.flag_outlined;
       case QuestType.generated:
-        return Icons.auto_awesome_outlined; // або auro_fix_high
+        return Icons.auto_awesome_outlined;
       case QuestType.story:
         return Icons.menu_book_outlined;
       default:
@@ -56,22 +54,17 @@ class QuestCard extends StatelessWidget {
     final difficultyColor = _getDifficultyColor(quest.difficulty, context);
 
     return Card(
-      // margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-      // elevation вже в темі, margin теж
       shape: RoundedRectangleBorder(
-        // Додамо рамку кольору складності
         side: BorderSide(color: difficultyColor, width: 1.5),
-        borderRadius: BorderRadius.circular(8.0), // Такий же як в CardTheme
+        borderRadius: BorderRadius.circular(8.0),
       ),
       child: InkWell(
         onTap: () {
-          // Показати деталі квесту в діалоговому вікні
           showDialog(
             context: context,
             builder: (BuildContext ctx) {
               return AlertDialog(
-                backgroundColor:
-                    theme.cardTheme.color, // Використовуємо колір з теми
+                backgroundColor: theme.cardTheme.color,
                 title: Row(
                   children: [
                     Icon(_getQuestTypeIcon(quest.type),
@@ -86,7 +79,7 @@ class QuestCard extends StatelessWidget {
                   child: ListBody(
                     children: <Widget>[
                       Text(
-                          'Ранг: ${QuestModel.getQuestDifficultyName(quest.difficulty)}',
+                          'Rank: ${QuestModel.getQuestDifficultyName(quest.difficulty)}',
                           style: TextStyle(
                               color: difficultyColor,
                               fontWeight: FontWeight.bold)),
@@ -94,14 +87,14 @@ class QuestCard extends StatelessWidget {
                       Text(quest.description,
                           style: theme.textTheme.bodyMedium),
                       const SizedBox(height: 12),
-                      Text('Нагорода:',
+                      Text('Reward:',
                           style: theme.textTheme.bodyLarge
                               ?.copyWith(fontWeight: FontWeight.bold)),
                       Text('XP: ${quest.xpReward}',
                           style: theme.textTheme.bodyMedium),
                       if (quest.itemRewards != null) ...[
                         const SizedBox(height: 8),
-                        Text('Предмети:',
+                        Text('Items:',
                             style: theme.textTheme.bodyLarge
                                 ?.copyWith(fontWeight: FontWeight.bold)),
                         Column(
@@ -115,19 +108,19 @@ class QuestCard extends StatelessWidget {
                       if (quest.targetStat != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                            'Фокус: ${PlayerModel.getStatName(quest.targetStat!)}',
+                            'Focus: ${PlayerModel.getStatName(quest.targetStat!)}',
                             style: theme.textTheme.bodyMedium),
                       ],
                       const SizedBox(height: 8),
-                      Text('Тип: ${QuestModel.getQuestTypeName(quest.type)}',
+                      Text('Type: ${QuestModel.getQuestTypeName(quest.type)}',
                           style: theme.textTheme.bodyMedium),
                       if (quest.createdAt != null)
                         Text(
-                            'Додано: ${quest.createdAt!.day.toString().padLeft(2, '0')}.${quest.createdAt!.month.toString().padLeft(2, '0')}.${quest.createdAt!.year}',
+                            'Added: ${quest.createdAt!.day.toString().padLeft(2, '0')}.${quest.createdAt!.month.toString().padLeft(2, '0')}.${quest.createdAt!.year}',
                             style: theme.textTheme.bodySmall),
                       if (quest.isCompleted && quest.completedAt != null)
                         Text(
-                            'Виконано: ${quest.completedAt!.day.toString().padLeft(2, '0')}.${quest.completedAt!.month.toString().padLeft(2, '0')}.${quest.completedAt!.year}',
+                            'Completed: ${quest.completedAt!.day.toString().padLeft(2, '0')}.${quest.completedAt!.month.toString().padLeft(2, '0')}.${quest.completedAt!.year}',
                             style: theme.textTheme.bodySmall
                                 ?.copyWith(color: Colors.greenAccent)),
                     ],
@@ -137,16 +130,16 @@ class QuestCard extends StatelessWidget {
                   if (onComplete != null && !quest.isCompleted)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('Виконати'),
+                      label: const Text('Complete'),
                       style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green[700]),
                       onPressed: () {
-                        Navigator.of(ctx).pop(); // Закриваємо діалог
-                        onComplete!(); // Викликаємо зовнішній onComplete (який покаже свій діалог)
+                        Navigator.of(ctx).pop();
+                        onComplete!();
                       },
                     ),
                   TextButton(
-                    child: const Text('Закрити'),
+                    child: const Text('Close'),
                     onPressed: () {
                       Navigator.of(ctx).pop();
                     },
@@ -226,7 +219,7 @@ class QuestCard extends StatelessWidget {
                             horizontal: 12, vertical: 6),
                         textStyle: const TextStyle(fontSize: 14),
                       ),
-                      child: const Text('Виконати'),
+                      child: const Text('Complete'),
                     ),
                   if (quest.isCompleted)
                     const Row(
@@ -234,7 +227,7 @@ class QuestCard extends StatelessWidget {
                         Icon(Icons.check_circle,
                             color: Colors.greenAccent, size: 18),
                         SizedBox(width: 4),
-                        Text('Виконано',
+                        Text('Completed',
                             style: TextStyle(
                                 color: Colors.greenAccent, fontSize: 14)),
                       ],

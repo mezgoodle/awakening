@@ -28,7 +28,6 @@ class PlayerModel {
   List<String> learnedSkillIds;
   Map<PhysicalActivity, dynamic>? baselinePhysicalPerformance;
   Map<String, String> activeBuffs;
-  bool initialSurveyCompleted;
   late QuestDifficulty playerRank;
 
   late int maxHp;
@@ -44,7 +43,7 @@ class PlayerModel {
   List<Map<String, dynamic>> inventory;
 
   PlayerModel({
-    this.playerName = "Мисливець",
+    this.playerName = "Hunter",
     this.level = 1,
     this.xp = 0,
     Map<PlayerStat, int>? initialStats,
@@ -52,7 +51,6 @@ class PlayerModel {
     this.availableStatPoints = 0,
     this.availableSkillPoints = 0,
     this.baselinePhysicalPerformance,
-    this.initialSurveyCompleted = false,
     this.playerRank = QuestDifficulty.F,
     int? loadedCurrentHp,
     int? loadedCurrentMp,
@@ -89,14 +87,12 @@ class PlayerModel {
         (level * baseMpPerLevel) + (intelligence * mpPerIntelligencePoint) + 20;
   }
 
-  // Метод, що викликається при підвищенні рівня (з PlayerProvider)
   void onLevelUp() {
     _calculateAndUpdateHpMp();
     currentHp = maxHp;
     currentMp = maxMp;
   }
 
-  // Метод, що викликається при зміні характеристик (з PlayerProvider)
   void onStatsChanged() {
     int oldMaxHp = maxHp;
     int oldMaxMp = maxMp;
@@ -142,15 +138,15 @@ class PlayerModel {
   static String getStatName(PlayerStat stat) {
     switch (stat) {
       case PlayerStat.strength:
-        return "Сила";
+        return "Strength";
       case PlayerStat.agility:
-        return "Спритність";
+        return "Agility";
       case PlayerStat.intelligence:
-        return "Інтелект";
+        return "Intelligence";
       case PlayerStat.perception:
-        return "Сприйняття";
+        return "Perception";
       case PlayerStat.stamina:
-        return "Витривалість";
+        return "Stamina";
     }
   }
 
@@ -167,7 +163,6 @@ class PlayerModel {
       'baselinePhysicalPerformance': baselinePhysicalPerformance?.map(
         (key, value) => MapEntry(key.name, value),
       ),
-      'initialSurveyCompleted': initialSurveyCompleted,
       'activeBuffs': activeBuffs,
       'inventory': inventory,
       'playerRank': playerRank.name,
@@ -215,7 +210,7 @@ class PlayerModel {
     }
 
     return PlayerModel(
-      playerName: json['playerName'] as String? ?? "Мисливець",
+      playerName: json['playerName'] as String? ?? "Hunter",
       level: json['level'] as int? ?? 1,
       xp: json['xp'] as int? ?? 0,
       initialStats: loadedStats,
@@ -228,7 +223,6 @@ class PlayerModel {
       initialInventory: (json['inventory'] as List<dynamic>?)
           ?.map((item) => Map<String, dynamic>.from(item))
           .toList(),
-      initialSurveyCompleted: json['initialSurveyCompleted'] as bool? ?? false,
       playerRank: json['playerRank'] != null &&
               (json['playerRank'] as String).isNotEmpty
           ? QuestDifficulty.values.byName(json['playerRank'] as String)

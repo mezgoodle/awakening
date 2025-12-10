@@ -5,7 +5,7 @@ import 'package:awakening/models/system_message_model.dart';
 import 'package:awakening/services/cloud_logger_service.dart';
 
 class SystemLogProvider with ChangeNotifier {
-  List<SystemMessageModel> _messages = [];
+  final List<SystemMessageModel> _messages = [];
   SystemMessageModel? _latestMessageForSnackbar;
 
   PlayerProvider? _playerProvider;
@@ -32,7 +32,6 @@ class SystemLogProvider with ChangeNotifier {
       {bool showInSnackbar = true, Map<String, dynamic>? payload}) {
     final newMessage = SystemMessageModel(text: text, type: type);
 
-    // Оновлюємо UI
     _messages.insert(0, newMessage);
     if (showInSnackbar) {
       _latestMessageForSnackbar = newMessage;
