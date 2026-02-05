@@ -9,7 +9,7 @@ class GeminiQuestService {
   final GenerativeModel _model;
   final CloudLoggerService _logger = CloudLoggerService();
 
-  static const String modelName = 'gemini-2.0-flash-001';
+  static const String modelName = 'gemini-2.5-flash-lite';
 
   GeminiQuestService()
       : _model = FirebaseAI.googleAI().generativeModel(
