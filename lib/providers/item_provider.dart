@@ -1,64 +1,40 @@
-import 'package:awakening/services/cloud_logger_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:awakening/models/item_model.dart';
+import '../models/item_model.dart';
+import '../repositories/catalog_repository.dart';
+import '../services/app_logger_service.dart';
 
 class ItemProvider with ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  final CloudLoggerService _logger = CloudLoggerService();
+  final CatalogRepository _catalogRepository;
+  final AppLoggerService _logger = AppLoggerService();
 
   Map<String, InventoryItem> _itemDictionary = {};
   bool _isLoading = true;
 
   Map<String, InventoryItem> get itemDictionary => _itemDictionary;
   bool get isLoading => _isLoading;
-
   List<String> get allItemIds => _itemDictionary.keys.toList();
 
-  ItemProvider() {
-    _loadAllItemsFromFirestore();
+  ItemProvider({CatalogRepository? catalogRepository})
+      : _catalogRepository = catalogRepository ?? CatalogRepository() {
+    loadAllItems();
   }
 
-  Future<void> _loadAllItemsFromFirestore() async {
+  Future<void> loadAllItems() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final snapshot = await _firestore.collection('items').get();
-
-      final Map<String, InventoryItem> loadedItems = {};
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final itemId = data['id'] as String;
-
-        final effects = (data['effects'] as Map<String, dynamic>?)?.map(
-            (key, value) => MapEntry(
-                ItemEffectType.values.byName(key), (value as num).toDouble()));
-
-        final itemTemplate = InventoryItem(
-          itemId: itemId,
-          name: data['name'] as String,
-          description: data['description'] as String,
-          type: ItemType.values.byName(data['type'] as String),
-          iconPath: data['iconPath'] as String,
-          isStackable: data['isStackable'] as bool,
-          quantity: 1,
-          effects: effects ?? {},
-        );
-        loadedItems[itemId] = itemTemplate;
-      }
-
-      _itemDictionary = loadedItems;
+      _itemDictionary = await _catalogRepository.fetchItems();
       _logger.writeLog(
-        message: "Load items from Firestore.",
-        payload: {"itemCount": _itemDictionary.length},
+        message: "Loaded ${_itemDictionary.length} items from catalog.",
+        severity: LogSeverity.info,
       );
-    } catch (e) {
+    } catch (e, stack) {
       _logger.writeLog(
-        message: "Error loading items from Firestore",
-        severity: CloudLogSeverity.error,
-        payload: {"error": e.toString()},
+        message: "Error loading items from catalog: $e",
+        severity: LogSeverity.error,
+        error: e,
+        stackTrace: stack,
       );
       _itemDictionary = {};
     }

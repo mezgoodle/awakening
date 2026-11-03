@@ -1,6 +1,7 @@
-import 'package:awakening/screens/inventory_screen.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'inventory_screen.dart';
 import 'player_status_screen.dart';
 import 'quests_screen.dart';
 import 'skills_screen.dart';
@@ -16,6 +17,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  StreamSubscription? _snackbarSubscription;
 
   static final List<Widget> _widgetOptions = <Widget>[
     const PlayerStatusScreen(),
@@ -33,26 +35,22 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final systemLogProvider = context.read<SystemLogProvider>();
-    systemLogProvider.addListener(_showLatestSystemMessage);
-  }
-
-  @override
-  void dispose() {
-    context.read<SystemLogProvider>().removeListener(_showLatestSystemMessage);
-    super.dispose();
-  }
-
-  void _showLatestSystemMessage() {
-    final systemLogProvider = context.read<SystemLogProvider>();
-    final message = systemLogProvider.latestMessageForSnackbar;
-    if (message != null && mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final systemLogProvider = context.read<SystemLogProvider>();
+      _snackbarSubscription =
+          systemLogProvider.snackbarStream.listen((message) {
         if (mounted) {
           showSystemSnackBar(context, message);
         }
       });
-    }
+    });
+  }
+
+  @override
+  void dispose() {
+    _snackbarSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -62,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _widgetOptions.elementAt(_selectedIndex),
       ),
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.person_search_outlined),

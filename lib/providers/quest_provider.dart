@@ -1,70 +1,62 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-
-import '../models/quest_model.dart';
+import '../models/item_model.dart';
 import '../models/player_model.dart';
+import '../models/quest_model.dart';
+import '../models/system_message_model.dart';
+import '../repositories/player_repository.dart';
+import '../repositories/quest_repository.dart';
+import '../services/app_logger_service.dart';
+import '../services/gemini_quest_service.dart';
+import 'item_provider.dart';
 import 'player_provider.dart';
 import 'system_log_provider.dart';
-import 'item_provider.dart';
-import 'package:awakening/services/gemini_quest_service.dart';
-import 'package:awakening/models/system_message_model.dart';
-import 'package:awakening/services/cloud_logger_service.dart';
 
 class QuestProvider with ChangeNotifier {
   List<QuestModel> _activeQuests = [];
   List<QuestModel> _completedQuests = [];
   bool _isLoading = true;
-  final GeminiQuestService _geminiService = GeminiQuestService();
   bool _isGeneratingQuest = false;
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GeminiQuestService _geminiService;
+  final QuestRepository _questRepository;
+  final PlayerRepository _playerRepository;
+  final AppLoggerService _logger = AppLoggerService();
 
   PlayerProvider? _playerProvider;
   ItemProvider? _itemProvider;
 
-  final CloudLoggerService _logger = CloudLoggerService();
-
-  static const String _lastDailyQuestGenerationKey =
-      'lastDailyQuestGenerationDate';
-
-  List<QuestModel> get activeQuests => _activeQuests;
-  List<QuestModel> get completedQuests => _completedQuests;
+  List<QuestModel> get activeQuests => List.unmodifiable(_activeQuests);
+  List<QuestModel> get completedQuests => List.unmodifiable(_completedQuests);
   bool get isLoading => _isLoading;
   bool get isGeneratingQuest => _isGeneratingQuest;
 
-  QuestProvider();
+  QuestProvider({
+    GeminiQuestService? geminiService,
+    QuestRepository? questRepository,
+    PlayerRepository? playerRepository,
+  })  : _geminiService = geminiService ?? GeminiQuestService(),
+        _questRepository = questRepository ?? QuestRepository(),
+        _playerRepository = playerRepository ?? PlayerRepository();
 
   void update(PlayerProvider? playerProvider, ItemProvider? itemProvider) {
+    _itemProvider = itemProvider;
     if (playerProvider != null &&
         _playerProvider != playerProvider &&
         !playerProvider.isLoading) {
       _playerProvider = playerProvider;
-      _itemProvider = itemProvider;
       _loadQuests();
     } else if (playerProvider == null) {
-      _activeQuests.clear();
-      _completedQuests.clear();
+      _activeQuests = [];
+      _completedQuests = [];
+      notifyListeners();
     }
   }
 
-  CollectionReference? get _questsCollectionRef {
-    final uid = _playerProvider?.getUserId();
-    if (uid == null) return null;
-    return _firestore.collection('players').doc(uid).collection('quests');
-  }
-
-  DocumentReference? get _playerDocRef {
-    final uid = _playerProvider?.getUserId();
-    if (uid == null) return null;
-    return _firestore.collection('players').doc(uid);
-  }
+  String? get _uid => _playerProvider?.getUserId();
 
   Future<void> _loadQuests() async {
-    if (_questsCollectionRef == null) {
-      _logger.writeLog(
-        message: "Cannot load quests, no user ID.",
-        severity: CloudLogSeverity.error,
-      );
+    final uid = _uid;
+    if (uid == null) {
       _isLoading = false;
       notifyListeners();
       return;
@@ -74,36 +66,20 @@ class QuestProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final activeSnapshot = await _questsCollectionRef!
-          .where('isCompleted', isEqualTo: false)
-          .get();
-      _activeQuests = activeSnapshot.docs
-          .map(
-              (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
-          .toList();
-      _logger.writeLog(
-        message: "Loaded ${_activeQuests.length} active quests from Firestore.",
-        payload: {"userId": _playerProvider?.getUserId()},
-      );
+      _activeQuests = await _questRepository.fetchActiveQuests(uid);
+      _completedQuests = await _questRepository.fetchCompletedQuests(uid);
+      _sortActiveQuests();
 
-      final completedSnapshot = await _questsCollectionRef!
-          .where('isCompleted', isEqualTo: true)
-          .orderBy('completedAt', descending: true)
-          .limit(50)
-          .get();
-      _completedQuests = completedSnapshot.docs
-          .map(
-              (doc) => QuestModel.fromJson(doc.data()! as Map<String, dynamic>))
-          .toList();
       _logger.writeLog(
-          message:
-              "Loaded ${_completedQuests.length} completed quests from Firestore.",
-          payload: {"userId": _playerProvider?.getUserId()});
-    } catch (e) {
+        message:
+            "Loaded ${_activeQuests.length} active and ${_completedQuests.length} completed quests.",
+      );
+    } catch (e, stack) {
       _logger.writeLog(
-        message: "Error loading quests from Firestore: $e",
-        severity: CloudLogSeverity.error,
-        payload: {"userId": _playerProvider?.getUserId()},
+        message: "Error loading quests: $e",
+        severity: LogSeverity.error,
+        error: e,
+        stackTrace: stack,
       );
       _activeQuests = [];
       _completedQuests = [];
@@ -113,37 +89,39 @@ class QuestProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void _sortActiveQuests() {
+    _activeQuests.sort((a, b) {
+      if (a.type == QuestType.daily && b.type != QuestType.daily) return -1;
+      if (a.type != QuestType.daily && b.type == QuestType.daily) return 1;
+      final diffCompare = b.difficulty.index.compareTo(a.difficulty.index);
+      if (diffCompare != 0) return diffCompare;
+      return (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0));
+    });
+  }
+
   Future<void> addQuest(QuestModel quest, SystemLogProvider slog,
       {bool showSnackbar = true}) async {
-    if (_questsCollectionRef == null) return;
+    final uid = _uid;
+    if (uid == null) return;
 
     _activeQuests.insert(0, quest);
+    _sortActiveQuests();
     notifyListeners();
-    slog.addMessage("New quest: '${quest.title}'", MessageType.questAdded,
+
+    slog.addMessage("New quest acquired: '${quest.title}'", MessageType.questAdded,
         showInSnackbar: showSnackbar);
 
     try {
-      await _questsCollectionRef!.doc(quest.id).set(quest.toJson());
+      await _questRepository.saveQuest(uid, quest);
+      _logger.writeLog(message: "Quest '${quest.title}' saved to Firestore.");
+    } catch (e, stack) {
       _logger.writeLog(
-        message: "Quest '${quest.title}' added to Firestore.",
-        payload: {
-          "questId": quest.id,
-          "questTitle": quest.title,
-          "userId": _playerProvider?.getUserId()
-        },
+        message: "Error saving quest '${quest.title}': $e",
+        severity: LogSeverity.error,
+        error: e,
+        stackTrace: stack,
       );
-    } catch (e) {
-      _logger.writeLog(
-        message: "Error adding quest '${quest.title}' to Firestore",
-        severity: CloudLogSeverity.error,
-        payload: {
-          "questId": quest.id,
-          "questTitle": quest.title,
-          "userId": _playerProvider?.getUserId(),
-          "error": e.toString()
-        },
-      );
-      slog.addMessage("Error adding quest '${quest.title}'", MessageType.error);
+      slog.addMessage("Failed to save quest '${quest.title}'.", MessageType.error);
       _activeQuests.removeWhere((q) => q.id == quest.id);
       notifyListeners();
     }
@@ -151,225 +129,230 @@ class QuestProvider with ChangeNotifier {
 
   Future<void> completeQuest(String questId, PlayerProvider playerProvider,
       SystemLogProvider slog) async {
-    if (_questsCollectionRef == null) return;
+    final uid = _uid;
+    if (uid == null) return;
 
     final questIndex = _activeQuests.indexWhere((q) => q.id == questId);
-    if (questIndex != -1) {
-      QuestModel quest = _activeQuests[questIndex];
+    if (questIndex == -1) return;
 
-      _activeQuests.removeAt(questIndex);
-      quest.isCompleted = true;
-      quest.completedAt = DateTime.now();
-      _completedQuests.insert(0, quest);
-      notifyListeners();
+    QuestModel quest = _activeQuests[questIndex];
+    _activeQuests.removeAt(questIndex);
+    final completedQuest = quest.copyWith(
+      isCompleted: true,
+      completedAt: DateTime.now(),
+    );
+    _completedQuests.insert(0, completedQuest);
+    notifyListeners();
 
-      playerProvider.addXp(quest.xpReward, slog);
+    playerProvider.addXp(quest.xpReward, slog);
 
-      if (quest.itemRewards != null && quest.itemRewards!.isNotEmpty) {
-        for (var itemData in quest.itemRewards!) {
-          final itemId = itemData['itemId'] as String?;
-          final quantity = itemData['quantity'] as int?;
-
-          if (itemId != null && quantity != null && quantity > 0) {
-            playerProvider.addItemToInventory(itemId, quantity);
-            slog.addMessage(
-                "Received item: $itemId (x$quantity)", MessageType.info,
-                showInSnackbar: true);
-          }
-        }
-      }
-
-      if (quest.hpCostOnCompletion != null && quest.hpCostOnCompletion! > 0) {
-        playerProvider.takePlayerDamage(quest.hpCostOnCompletion!);
+    if (quest.itemRewards != null && quest.itemRewards!.isNotEmpty) {
+      for (final reward in quest.itemRewards!) {
+        playerProvider.addItemToInventory(reward.itemId, reward.quantity);
+        final itemName =
+            _itemProvider?.getItemById(reward.itemId)?.name ?? reward.itemId;
         slog.addMessage(
-            "You have made many efforts! Lost ${quest.hpCostOnCompletion} HP.",
-            MessageType.warning);
+          "Reward received: $itemName (x${reward.quantity})",
+          MessageType.info,
+          showInSnackbar: true,
+        );
       }
+    }
 
-      if (quest.type == QuestType.rankUpChallenge) {
-        QuestDifficulty currentRank = playerProvider.player.playerRank;
-        if (currentRank.index < QuestDifficulty.values.length - 1) {
-          QuestDifficulty awardedRank =
-              QuestDifficulty.values[currentRank.index + 1];
-          QuestDifficulty maxRankByLevel =
-              PlayerModel.calculateRankByLevel(playerProvider.player.level);
-          if (awardedRank.index <= maxRankByLevel.index) {
-            playerProvider.awardNewRank(awardedRank, slog);
-          } else {
-            slog.addMessage(
-                "Cannot award rank ${QuestModel.getQuestDifficultyName(awardedRank)}, it is higher than the maximum available rank.",
-                MessageType.warning);
-          }
+    if (quest.hpCostOnCompletion != null && quest.hpCostOnCompletion! > 0) {
+      playerProvider.takePlayerDamage(quest.hpCostOnCompletion!);
+      slog.addMessage(
+        "Exerted tremendous physical effort! Lost ${quest.hpCostOnCompletion} HP.",
+        MessageType.warning,
+      );
+    }
+
+    if (quest.type == QuestType.rankUpChallenge) {
+      final currentRank = playerProvider.player.playerRank;
+      if (currentRank.index < QuestDifficulty.values.length - 1) {
+        final awardedRank = QuestDifficulty.values[currentRank.index + 1];
+        final maxRankByLevel =
+            PlayerModel.calculateRankByLevel(playerProvider.player.level);
+        if (awardedRank.index <= maxRankByLevel.index) {
+          playerProvider.awardNewRank(awardedRank, slog);
+        } else {
+          slog.addMessage(
+            "Cannot award ${QuestModel.getQuestDifficultyName(awardedRank)}-Rank: level requirement not met.",
+            MessageType.warning,
+          );
         }
       }
+    }
 
-      slog.addMessage(
-          "Завдання '${quest.title}' виконано! Нагорода: ${quest.xpReward} XP.",
-          MessageType.questCompleted);
+    slog.addMessage(
+      "Quest '${quest.title}' completed! +${quest.xpReward} XP.",
+      MessageType.questCompleted,
+    );
 
-      try {
-        await _questsCollectionRef!.doc(questId).update({
-          'isCompleted': true,
-          'completedAt': quest.completedAt?.toIso8601String(),
-        });
-        _logger.writeLog(
-          message: "Quest '$questId' marked as completed in Firestore.",
-          payload: {
-            "questId": quest.id,
-            "questTitle": quest.title,
-            "userId": _playerProvider?.getUserId()
-          },
-        );
-      } catch (e) {
-        _logger.writeLog(
-          message: "Error updating quest '$questId' in Firestore",
-          severity: CloudLogSeverity.error,
-          payload: {
-            "questId": quest.id,
-            "questTitle": quest.title,
-            "userId": _playerProvider?.getUserId(),
-            "error": e.toString()
-          },
-        );
-        slog.addMessage("Помилка оновлення статусу завдання '${quest.title}'",
-            MessageType.error);
-        _completedQuests.removeWhere((q) => q.id == questId);
-        _activeQuests.insert(
-            questIndex,
-            quest
-              ..isCompleted = false
-              ..completedAt = null);
-        notifyListeners();
-      }
+    try {
+      await _questRepository.markQuestCompleted(
+        uid,
+        questId,
+        completedQuest.completedAt ?? DateTime.now(),
+      );
+      _logger.writeLog(message: "Quest '$questId' marked as completed.");
+    } catch (e, stack) {
+      _logger.writeLog(
+        message: "Error updating quest '$questId' in Firestore: $e",
+        severity: LogSeverity.error,
+        error: e,
+        stackTrace: stack,
+      );
+      slog.addMessage("Failed to update status for '${quest.title}'.", MessageType.error);
+      _completedQuests.removeWhere((q) => q.id == questId);
+      _activeQuests.insert(questIndex, quest);
+      _sortActiveQuests();
+      notifyListeners();
     }
   }
 
   Future<void> generateDailyQuestsIfNeeded(
       PlayerProvider playerProvider, SystemLogProvider slog) async {
-    if (_playerDocRef == null) return;
-
-    String? lastGenerationDateStr;
-    try {
-      final playerDoc = await _playerDocRef!.get();
-      if (playerDoc.exists) {
-        final data = playerDoc.data() as Map<String, dynamic>;
-        lastGenerationDateStr = data[_lastDailyQuestGenerationKey];
-      }
-    } catch (e) {
-      _logger.writeLog(
-        message: "Could not read last daily quest generation date",
-        severity: CloudLogSeverity.error,
-        payload: {
-          "context": {
-            "userId": _playerProvider?.getUserId(),
-            "error": e.toString()
-          }
-        },
-      );
-    }
+    final uid = _uid;
+    if (uid == null) return;
 
     final today = DateTime.now();
     final todayDateOnly = DateTime(today.year, today.month, today.day);
-    bool shouldGenerate = true;
-    if (lastGenerationDateStr != null) {
-      final lastGenerationDate = DateTime.parse(lastGenerationDateStr);
-      if (lastGenerationDate.isAtSameMomentAs(todayDateOnly)) {
-        shouldGenerate = false;
+    final todayDateString = todayDateOnly.toIso8601String();
+
+    final lastGen = playerProvider.player.lastDailyQuestGenerationDate;
+    if (lastGen != null) {
+      final lastGenDate = DateTime.tryParse(lastGen);
+      if (lastGenDate != null &&
+          lastGenDate.year == todayDateOnly.year &&
+          lastGenDate.month == todayDateOnly.month &&
+          lastGenDate.day == todayDateOnly.day) {
+        slog.addMessage("Daily quests are already up to date for today.", MessageType.info);
+        return;
       }
     }
 
-    if (shouldGenerate) {
-      if (playerProvider.isLoading || (_itemProvider?.isLoading ?? true)) {
-        return;
-      }
+    if (playerProvider.isLoading || (_itemProvider?.isLoading ?? true)) return;
 
-      _isGeneratingQuest = true;
+    _isGeneratingQuest = true;
+    notifyListeners();
+
+    const int maxDailyQuests = 5;
+    final existingDailyQuests =
+        _activeQuests.where((q) => q.type == QuestType.daily).toList();
+    final int questsToGenerateCount = maxDailyQuests - existingDailyQuests.length;
+
+    if (questsToGenerateCount <= 0) {
+      // Already has full daily quest roster, record the generation date
+      playerProvider.player.lastDailyQuestGenerationDate = todayDateString;
+      await _playerRepository.updateDailyQuestGenerationDate(uid, todayDateString);
+      _isGeneratingQuest = false;
       notifyListeners();
+      return;
+    }
 
-      const int maxDailyQuests = 5;
-      final existingDailyQuests =
-          _activeQuests.where((q) => q.type == QuestType.daily).toList();
-      final int questsToGenerateCount =
-          maxDailyQuests - existingDailyQuests.length;
+    final Set<PlayerStat> existingStats = existingDailyQuests
+        .where((q) => q.targetStat != null)
+        .map((q) => q.targetStat!)
+        .toSet();
 
-      if (questsToGenerateCount <= 0) {
-        _isGeneratingQuest = false;
-        notifyListeners();
-        return;
-      }
+    final List<PlayerStat> neededStats =
+        PlayerStat.values.where((stat) => !existingStats.contains(stat)).toList();
+    neededStats.shuffle();
 
-      final Set<PlayerStat> existingQuestStats = existingDailyQuests
-          .where((q) => q.targetStat != null)
-          .map((q) => q.targetStat!)
-          .toSet();
+    final statsToGenerateFor = neededStats.take(questsToGenerateCount).toList();
+    final currentPlayer = playerProvider.player;
 
-      final List<PlayerStat> neededQuestStats = PlayerStat.values
-          .where((stat) => !existingQuestStats.contains(stat))
-          .toList();
-
-      neededQuestStats.shuffle();
-
-      final statsToGenerateFor =
-          neededQuestStats.take(questsToGenerateCount).toList();
-
-      PlayerModel currentPlayer = playerProvider.player;
-      List<Future<void>> questGenerationFutures = [];
-
-      for (PlayerStat stat in statsToGenerateFor) {
-        questGenerationFutures.add(_geminiService
-            .generateQuest(
+    final List<Future<void>> futures = [];
+    for (final stat in statsToGenerateFor) {
+      futures.add(() async {
+        final generatedQuest = await _geminiService.generateQuest(
           player: currentPlayer,
           questType: QuestType.daily,
           targetStat: stat,
           availableItemIds: _itemProvider?.allItemIds ?? [],
-        )
-            .then((generatedQuest) async {
-          if (generatedQuest != null) {
-            if (!_activeQuests.any((q) => q.title == generatedQuest.title)) {
-              await addQuest(generatedQuest, slog, showSnackbar: false);
-            }
-          } else {
-            _logger.writeLog(
-              message:
-                  "Gemini failed to generate daily quest for ${stat.name}, using fallback.",
-              severity: CloudLogSeverity.error,
-              payload: {
-                "context": {
-                  "stat": stat.name,
-                  "userId": _playerProvider?.getUserId()
-                }
-              },
-            );
+        );
 
-            final fallbackQuest =
-                _getFallbackDailyQuestForStat(stat, currentPlayer);
-            if (!_activeQuests.any((q) => q.title == fallbackQuest.title)) {
-              await addQuest(fallbackQuest, slog, showSnackbar: false);
-            }
+        if (generatedQuest != null) {
+          if (!_activeQuests.any((q) => q.title == generatedQuest.title)) {
+            await addQuest(generatedQuest, slog, showSnackbar: false);
           }
-        }));
-      }
-
-      await Future.wait(questGenerationFutures);
-      slog.addMessage("Щоденні завдання оновлено.", MessageType.info);
-
-      _isGeneratingQuest = false;
-      notifyListeners();
+        } else {
+          final fallbackQuest = _getFallbackDailyQuestForStat(stat, currentPlayer);
+          if (!_activeQuests.any((q) => q.title == fallbackQuest.title)) {
+            await addQuest(fallbackQuest, slog, showSnackbar: false);
+          }
+        }
+      }());
     }
+
+    await Future.wait(futures);
+
+    // Save generation date so quests don't regenerate infinitely
+    playerProvider.player.lastDailyQuestGenerationDate = todayDateString;
+    try {
+      await _playerRepository.updateDailyQuestGenerationDate(uid, todayDateString);
+    } catch (_) {}
+
+    slog.addMessage("Daily quests assigned for today.", MessageType.info);
+    _isGeneratingQuest = false;
+    notifyListeners();
   }
 
   QuestModel _getFallbackDailyQuestForStat(
       PlayerStat stat, PlayerModel player) {
-    int xpBase = 15 + (player.level * 2);
+    final int xpBase = 15 + (player.level * 2);
     switch (stat) {
-      default:
+      case PlayerStat.strength:
         return QuestModel(
-            title: "Default Daily",
-            description: "Default desc",
-            xpReward: xpBase,
-            type: QuestType.daily,
-            difficulty: QuestDifficulty.E,
-            targetStat: stat);
+          title: "Shadow Conditioning: Push-ups",
+          description:
+              "Complete 3 sets of bodyweight push-ups focusing on steady cadence and strict posture.",
+          xpReward: xpBase,
+          type: QuestType.daily,
+          difficulty: QuestDifficulty.E,
+          targetStat: PlayerStat.strength,
+        );
+      case PlayerStat.agility:
+        return QuestModel(
+          title: "Shadow Agility: Mobility Drill",
+          description:
+              "Perform 15 minutes of dynamic body mobility and hip/shoulder stretching routines.",
+          xpReward: xpBase,
+          type: QuestType.daily,
+          difficulty: QuestDifficulty.E,
+          targetStat: PlayerStat.agility,
+        );
+      case PlayerStat.intelligence:
+        return QuestModel(
+          title: "Archive Research: Deep Study",
+          description:
+              "Dedicate 20 minutes of undisturbed focus to reading high-value non-fiction or solving analytical puzzles.",
+          xpReward: xpBase,
+          type: QuestType.daily,
+          difficulty: QuestDifficulty.E,
+          targetStat: PlayerStat.intelligence,
+        );
+      case PlayerStat.perception:
+        return QuestModel(
+          title: "Sensory Calibration: Mindful Scan",
+          description:
+              "Spend 15 minutes observing your immediate environment without digital distractions.",
+          xpReward: xpBase,
+          type: QuestType.daily,
+          difficulty: QuestDifficulty.E,
+          targetStat: PlayerStat.perception,
+        );
+      case PlayerStat.stamina:
+        return QuestModel(
+          title: "Endurance March: Cardio Pulse",
+          description:
+              "Complete a 20-minute brisk walk, light jog, or cycling session to raise cardiovascular endurance.",
+          xpReward: xpBase,
+          type: QuestType.daily,
+          difficulty: QuestDifficulty.E,
+          targetStat: PlayerStat.stamina,
+        );
     }
   }
 
@@ -386,24 +369,22 @@ class QuestProvider with ChangeNotifier {
     _isGeneratingQuest = true;
     notifyListeners();
 
-    final List<String> availableItemIds = itemProvider.allItemIds;
-
-    QuestModel? newQuest = await _geminiService.generateQuest(
+    final QuestModel? newQuest = await _geminiService.generateQuest(
       player: playerProvider.player,
       questType: questType,
       targetStat: targetStat,
       customPromptInstruction: customInstruction,
-      availableItemIds: availableItemIds,
+      availableItemIds: itemProvider.allItemIds,
     );
 
     if (newQuest != null) {
       await addQuest(newQuest, slog);
     } else {
       _logger.writeLog(
-        message: "Failed to generate a new quest using Gemini API.",
-        severity: CloudLogSeverity.error,
+        message: "Failed to generate quest via Gemini API.",
+        severity: LogSeverity.error,
       );
-      slog.addMessage("Не вдалося згенерувати завдання.", MessageType.error);
+      slog.addMessage("Failed to generate quest. Please try again.", MessageType.error);
     }
 
     _isGeneratingQuest = false;
@@ -412,33 +393,22 @@ class QuestProvider with ChangeNotifier {
   }
 
   Future<void> resetAllQuests() async {
-    if (_questsCollectionRef == null) return;
+    final uid = _uid;
+    if (uid == null) return;
 
     _activeQuests.clear();
     _completedQuests.clear();
     notifyListeners();
 
     try {
-      final snapshot = await _questsCollectionRef!.get();
-      WriteBatch batch = _firestore.batch();
-      for (var doc in snapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      await batch.commit();
+      await _questRepository.deleteAllQuests(uid);
+      _logger.writeLog(message: "All quests deleted from Firestore for user $uid.");
+    } catch (e, stack) {
       _logger.writeLog(
-        message: "All quests deleted from Firestore for the user.",
-        payload: {"userId": _playerProvider?.getUserId()},
-      );
-    } catch (e) {
-      _logger.writeLog(
-        message: "Error deleting all quests from Firestore",
-        severity: CloudLogSeverity.error,
-        payload: {
-          "context": {
-            "userId": _playerProvider?.getUserId(),
-            "error": e.toString()
-          }
-        },
+        message: "Error deleting all quests: $e",
+        severity: LogSeverity.error,
+        error: e,
+        stackTrace: stack,
       );
     }
   }

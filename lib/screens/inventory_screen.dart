@@ -1,4 +1,3 @@
-import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +5,7 @@ import '../models/item_model.dart';
 import '../providers/player_provider.dart';
 import '../providers/item_provider.dart';
 import '../providers/system_log_provider.dart';
+import '../providers/theme_provider.dart';
 
 class InventoryScreen extends StatelessWidget {
   const InventoryScreen({super.key});
@@ -24,9 +24,22 @@ class InventoryScreen extends StatelessWidget {
     }
 
     final List<InventoryItem> inventoryItems = playerProvider.player.inventory
-        .map((itemData) =>
-            InventoryItem.fromJson(itemData, itemProvider.itemDictionary))
+        .map((entry) {
+          final template = itemProvider.getItemById(entry.itemId);
+          if (template != null) {
+            return template.copyWith(quantity: entry.quantity);
+          }
+          return InventoryItem(
+            itemId: entry.itemId,
+            name: entry.itemId,
+            description: 'Item details unavailable in local catalog.',
+            type: ItemType.collectible,
+            iconPath: 'assets/icons/items/unknown.svg',
+            quantity: entry.quantity,
+          );
+        })
         .toList();
+
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
@@ -37,30 +50,36 @@ class InventoryScreen extends StatelessWidget {
             icon: Icon(themeProvider.themeMode == ThemeMode.dark
                 ? Icons.dark_mode
                 : Icons.light_mode),
-            onPressed: () {
-              themeProvider.toggleTheme();
-            },
+            tooltip: 'Toggle Theme',
+            onPressed: () => themeProvider.toggleTheme(),
           ),
         ],
       ),
       body: inventoryItems.isEmpty
-          ? const Center(child: Text('Inventory is empty.'))
+          ? const Center(
+              child: Text(
+                'Inventory is empty.\nComplete quests to obtain potions and materials.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
+            )
           : GridView.builder(
               padding: const EdgeInsets.all(12.0),
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: 120.0,
                 crossAxisSpacing: 12.0,
                 mainAxisSpacing: 12.0,
-                childAspectRatio: 0.8,
+                childAspectRatio: 0.85,
               ),
               itemCount: inventoryItems.length,
               itemBuilder: (context, index) {
                 final item = inventoryItems[index];
                 return InventorySlot(
-                    item: item,
-                    onUse: () {
-                      playerProvider.useItem(item.itemId, slog);
-                    });
+                  item: item,
+                  onUse: () {
+                    playerProvider.useItem(item.itemId, slog);
+                  },
+                );
               },
             ),
     );
@@ -87,17 +106,34 @@ class InventorySlot extends StatelessWidget {
               children: [
                 Text(item.description),
                 const SizedBox(height: 10),
-                Text('Quantity: ${item.quantity}'),
+                if (item.effectsSummary.isNotEmpty) ...[
+                  Text(
+                    'Effect: ${item.effectsSummary}',
+                    style: const TextStyle(
+                      color: Colors.greenAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Text(
+                  'Quantity: ${item.quantity}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ],
             ),
             actions: [
               if (item.type == ItemType.potion)
-                TextButton(
+                ElevatedButton(
                   onPressed: () {
-                    onUse();
                     Navigator.of(ctx).pop();
+                    onUse();
                   },
-                  child: const Text('Use'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[700],
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Use Potion'),
                 ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -128,13 +164,13 @@ class InventorySlot extends StatelessWidget {
             ),
             if (item.isStackable && item.quantity > 1)
               Positioned(
-                bottom: 5,
-                right: 5,
+                bottom: 6,
+                right: 6,
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
+                    color: Colors.black.withValues(alpha: 0.75),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -157,7 +193,7 @@ class InventorySlot extends StatelessWidget {
     if (iconPath.trim().isEmpty) {
       return const Icon(
         Icons.inventory_2_outlined,
-        size: 48,
+        size: 44,
         color: Colors.grey,
       );
     }
@@ -165,16 +201,22 @@ class InventorySlot extends StatelessWidget {
     if (lower.endsWith('.svg')) {
       return SvgPicture.asset(
         iconPath,
-        placeholderBuilder: (context) => const Icon(Icons.inventory_2_outlined,
-            size: 32, color: Colors.grey),
+        placeholderBuilder: (context) => const Icon(
+          Icons.inventory_2_outlined,
+          size: 32,
+          color: Colors.grey,
+        ),
       );
     } else {
       return Image.asset(
         iconPath,
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.error_outline,
-              size: 32, color: Colors.redAccent);
+          return const Icon(
+            Icons.inventory_2_outlined,
+            size: 32,
+            color: Colors.grey,
+          );
         },
       );
     }

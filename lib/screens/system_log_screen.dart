@@ -29,7 +29,7 @@ class SystemLogScreen extends StatelessWidget {
 
   Color _getColorForMessageType(MessageType type, BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    bool isDark = brightness == Brightness.dark;
+    final bool isDark = brightness == Brightness.dark;
 
     switch (type) {
       case MessageType.levelUp:
@@ -62,23 +62,25 @@ class SystemLogScreen extends StatelessWidget {
           if (messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
-              tooltip: 'Clear log',
+              tooltip: 'Clear Log',
               onPressed: () async {
-                bool? confirmClear = await showDialog<bool>(
+                final bool? confirmClear = await showDialog<bool>(
                   context: context,
                   builder: (BuildContext ctx) {
                     return AlertDialog(
-                      title: const Text('Clear Log?'),
+                      title: const Text('Clear System Log?'),
                       content: const Text(
-                          'Are you sure you want to delete all system messages?'),
+                        'Are you sure you want to delete all recorded system log entries?',
+                      ),
                       actions: <Widget>[
                         TextButton(
                           child: const Text('Cancel'),
                           onPressed: () => Navigator.of(ctx).pop(false),
                         ),
                         TextButton(
-                          style:
-                              TextButton.styleFrom(foregroundColor: Colors.red),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
                           child: const Text('Clear'),
                           onPressed: () => Navigator.of(ctx).pop(true),
                         ),
@@ -101,7 +103,7 @@ class SystemLogScreen extends StatelessWidget {
       body: messages.isEmpty
           ? Center(
               child: Text(
-                'System message log is empty.',
+                'No system log entries yet.',
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
@@ -122,7 +124,9 @@ class SystemLogScreen extends StatelessWidget {
                       const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0),
                   shape: RoundedRectangleBorder(
                     side: BorderSide(
-                        color: iconColor.withOpacity(0.5), width: 0.5),
+                      color: iconColor.withValues(alpha: 0.5),
+                      width: 0.5,
+                    ),
                     borderRadius: BorderRadius.circular(6.0),
                   ),
                   child: ListTile(
@@ -131,11 +135,13 @@ class SystemLogScreen extends StatelessWidget {
                       color: iconColor,
                       size: 28,
                     ),
-                    title: Text(message.text,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyLarge
-                            ?.copyWith(fontSize: 15)),
+                    title: Text(
+                      message.text,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontSize: 15),
+                    ),
                     subtitle: Text(
                       DateFormat('dd.MM.yyyy HH:mm:ss')
                           .format(message.timestamp),

@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'package:awakening/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/player_model.dart';
+import '../models/skill_model.dart';
 import '../providers/player_provider.dart';
 import '../providers/skill_provider.dart';
 import '../providers/system_log_provider.dart';
-import '../models/skill_model.dart';
-import '../models/player_model.dart';
+import '../providers/theme_provider.dart';
 
 class SkillsScreen extends StatelessWidget {
   const SkillsScreen({super.key});
@@ -18,7 +18,9 @@ class SkillsScreen extends StatelessWidget {
     final slog = context.read<SystemLogProvider>();
 
     if (playerProvider.isLoading || skillProvider.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     final player = playerProvider.player;
@@ -47,9 +49,8 @@ class SkillsScreen extends StatelessWidget {
             icon: Icon(themeProvider.themeMode == ThemeMode.dark
                 ? Icons.dark_mode
                 : Icons.light_mode),
-            onPressed: () {
-              themeProvider.toggleTheme();
-            },
+            tooltip: 'Toggle Theme',
+            onPressed: () => themeProvider.toggleTheme(),
           ),
           Center(
             child: Padding(
@@ -79,9 +80,7 @@ class SkillsScreen extends StatelessWidget {
 
   Widget _buildSkillSection(String title, List<SkillModel> skills,
       PlayerProvider playerProvider, SystemLogProvider slog) {
-    if (skills.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (skills.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,12 +90,13 @@ class SkillsScreen extends StatelessWidget {
           child: Text(
             title,
             style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.lightBlueAccent),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.lightBlueAccent,
+            ),
           ),
         ),
-        ...skills.map((skill) => SkillCard(skill: skill)).toList(),
+        ...skills.map((skill) => SkillCard(skill: skill)),
       ],
     );
   }
@@ -134,7 +134,6 @@ class _SkillCardState extends State<SkillCard> {
 
     final playerProvider = context.read<PlayerProvider>();
     final player = playerProvider.player;
-    if (player == null) return;
 
     final isBuffActive = player.activeBuffs.containsKey(widget.skill.id);
     final cooldownEndTime =
@@ -144,6 +143,12 @@ class _SkillCardState extends State<SkillCard> {
 
     if (isBuffActive || isOnCooldown) {
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          _timer = null;
+          return;
+        }
+
         final currentPlayer = context.read<PlayerProvider>().player;
         final currentBuffEndTimeString =
             currentPlayer.activeBuffs[widget.skill.id];
@@ -161,12 +166,7 @@ class _SkillCardState extends State<SkillCard> {
           _timer = null;
         }
 
-        if (mounted) {
-          setState(() {});
-        } else {
-          timer.cancel();
-          _timer = null;
-        }
+        setState(() {});
       });
     }
   }
@@ -202,7 +202,7 @@ class _SkillCardState extends State<SkillCard> {
 
     _startTimerIfNeeded();
 
-    Color borderColor = isLearned
+    final Color borderColor = isLearned
         ? Colors.amberAccent
         : (canLearn ? Colors.greenAccent : Colors.grey[700]!);
 
@@ -222,9 +222,13 @@ class _SkillCardState extends State<SkillCard> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(widget.skill.name,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      widget.skill.name,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   if (isLearned &&
                       widget.skill.skillType == SkillType.activeBuff &&
@@ -235,7 +239,9 @@ class _SkillCardState extends State<SkillCard> {
                         playerProvider.activateSkill(widget.skill.id, slog);
                       },
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[700]),
+                        backgroundColor: Colors.blue[700],
+                        foregroundColor: Colors.white,
+                      ),
                       child:
                           Text('Activate (${widget.skill.mpCost?.toInt()} MP)'),
                     ),
@@ -245,8 +251,10 @@ class _SkillCardState extends State<SkillCard> {
                         playerProvider.learnSkill(widget.skill.id, slog);
                       },
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[700]),
-                      child: Text('Learn (${widget.skill.skillPointCost})'),
+                        backgroundColor: Colors.green[700],
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('Learn (${widget.skill.skillPointCost} SP)'),
                     ),
                   if (isLearned &&
                       (widget.skill.skillType == SkillType.passive ||
@@ -258,16 +266,20 @@ class _SkillCardState extends State<SkillCard> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                widget.skill.description,
-              ),
-              const SizedBox(height: 10),
-              if (isBuffActive)
-                _buildTimerText('Active:', DateTime.parse(buffEndTimeString),
-                    Colors.greenAccent[400]!),
-              if (isOnCooldown && !isBuffActive)
+              Text(widget.skill.description),
+              const SizedBox(height: 8),
+              if (isBuffActive && buffEndTimeString != null)
                 _buildTimerText(
-                    'Cooldown:', cooldownEndTime, Colors.redAccent[100]!),
+                  'Active Duration:',
+                  DateTime.parse(buffEndTimeString),
+                  Colors.greenAccent[400]!,
+                ),
+              if (isOnCooldown && !isBuffActive && cooldownEndTime != null)
+                _buildTimerText(
+                  'Cooldown Remaining:',
+                  cooldownEndTime,
+                  Colors.redAccent[100]!,
+                ),
               if (isLocked) _buildRequirements(context, widget.skill, player),
             ],
           ),
@@ -282,7 +294,7 @@ class _SkillCardState extends State<SkillCard> {
     final minutes = durationToShow.inMinutes.toString();
     final seconds = (durationToShow.inSeconds % 60).toString().padLeft(2, '0');
     return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
+      padding: const EdgeInsets.only(top: 6.0),
       child: Text(
         '$prefix $minutes:$seconds',
         style: TextStyle(color: color, fontWeight: FontWeight.bold),
@@ -295,31 +307,47 @@ class _SkillCardState extends State<SkillCard> {
     final List<Widget> reqWidgets = [];
     final bool levelMet = player.level >= skill.levelRequirement;
     if (skill.levelRequirement > 1) {
-      reqWidgets.add(Text(
-          '• Level: ${skill.levelRequirement} (you have ${player.level})',
+      reqWidgets.add(
+        Text(
+          '• Level: ${skill.levelRequirement} (Current: ${player.level})',
           style: TextStyle(
-              color: levelMet ? Colors.greenAccent : Colors.redAccent)));
+            color: levelMet ? Colors.greenAccent : Colors.redAccent,
+          ),
+        ),
+      );
     }
     skill.statRequirements.forEach((stat, value) {
       final bool statMet = (player.stats[stat] ?? 0) >= value;
-      reqWidgets.add(Text(
-          '• ${PlayerModel.getStatName(stat)}: $value (you have ${player.stats[stat] ?? 0})',
+      reqWidgets.add(
+        Text(
+          '• ${PlayerModel.getStatName(stat)}: $value (Current: ${player.stats[stat] ?? 0})',
           style: TextStyle(
-              color: statMet ? Colors.greenAccent : Colors.redAccent)));
+            color: statMet ? Colors.greenAccent : Colors.redAccent,
+          ),
+        ),
+      );
     });
     if (skill.skillPointCost > 0) {
       final bool spMet = player.availableSkillPoints >= skill.skillPointCost;
-      reqWidgets.add(Text(
-          '• Skill points: ${skill.skillPointCost} (you have ${player.availableSkillPoints})',
-          style:
-              TextStyle(color: spMet ? Colors.greenAccent : Colors.redAccent)));
-    }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Requirements:',
+      reqWidgets.add(
+        Text(
+          '• Skill Points: ${skill.skillPointCost} (Available: ${player.availableSkillPoints})',
           style: TextStyle(
-            fontWeight: FontWeight.bold,
-          )),
-      ...reqWidgets
-    ]);
+            color: spMet ? Colors.greenAccent : Colors.redAccent,
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        const Text(
+          'Requirements:',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        ...reqWidgets,
+      ],
+    );
   }
 }

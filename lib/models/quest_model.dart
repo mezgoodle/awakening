@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'item_model.dart';
 import 'player_model.dart';
 
 enum QuestType {
@@ -24,7 +25,7 @@ class QuestModel {
   final DateTime? createdAt;
   DateTime? completedAt;
   final int? hpCostOnCompletion;
-  List<Map<String, dynamic>>? itemRewards;
+  List<QuestItemReward>? itemRewards;
 
   QuestModel({
     String? id,
@@ -41,6 +42,36 @@ class QuestModel {
     this.itemRewards,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
+
+  QuestModel copyWith({
+    String? id,
+    String? title,
+    String? description,
+    int? xpReward,
+    QuestType? type,
+    QuestDifficulty? difficulty,
+    PlayerStat? targetStat,
+    bool? isCompleted,
+    DateTime? createdAt,
+    DateTime? completedAt,
+    int? hpCostOnCompletion,
+    List<QuestItemReward>? itemRewards,
+  }) {
+    return QuestModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      xpReward: xpReward ?? this.xpReward,
+      type: type ?? this.type,
+      difficulty: difficulty ?? this.difficulty,
+      targetStat: targetStat ?? this.targetStat,
+      isCompleted: isCompleted ?? this.isCompleted,
+      createdAt: createdAt ?? this.createdAt,
+      completedAt: completedAt ?? this.completedAt,
+      hpCostOnCompletion: hpCostOnCompletion ?? this.hpCostOnCompletion,
+      itemRewards: itemRewards ?? this.itemRewards,
+    );
+  }
 
   static String getQuestTypeName(QuestType type) {
     switch (type) {
@@ -76,35 +107,46 @@ class QuestModel {
       'createdAt': createdAt?.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
       'hpCostOnCompletion': hpCostOnCompletion,
-      'itemRewards': itemRewards,
+      'itemRewards': itemRewards?.map((item) => item.toJson()).toList(),
     };
   }
 
   factory QuestModel.fromJson(Map<String, dynamic> json) {
     PlayerStat? parsedTargetStat;
     if (json['targetStat'] != null) {
-      parsedTargetStat = PlayerStat.values.byName(json['targetStat'] as String);
+      try {
+        parsedTargetStat = PlayerStat.values.byName(json['targetStat'] as String);
+      } catch (_) {}
+    }
+
+    List<QuestItemReward>? itemRewards;
+    if (json['itemRewards'] != null && json['itemRewards'] is List) {
+      itemRewards = (json['itemRewards'] as List<dynamic>)
+          .map((item) => QuestItemReward.fromJson(item as Map<String, dynamic>))
+          .toList();
     }
 
     return QuestModel(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      xpReward: json['xpReward'] as int,
-      type: QuestType.values.byName(json['type'] as String),
-      difficulty: QuestDifficulty.values.byName(json['difficulty'] as String),
+      id: json['id'] as String? ?? const Uuid().v4(),
+      title: json['title'] as String? ?? 'Untitled Quest',
+      description: json['description'] as String? ?? '',
+      xpReward: (json['xpReward'] as num?)?.toInt() ?? 0,
+      type: json['type'] != null
+          ? QuestType.values.byName(json['type'] as String)
+          : QuestType.generated,
+      difficulty: json['difficulty'] != null
+          ? QuestDifficulty.values.byName(json['difficulty'] as String)
+          : QuestDifficulty.F,
       targetStat: parsedTargetStat,
-      isCompleted: json['isCompleted'] as bool,
+      isCompleted: json['isCompleted'] as bool? ?? false,
       createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
+          ? DateTime.tryParse(json['createdAt'] as String)
           : null,
       completedAt: json['completedAt'] != null
-          ? DateTime.parse(json['completedAt'] as String)
+          ? DateTime.tryParse(json['completedAt'] as String)
           : null,
-      hpCostOnCompletion: json['hpCostOnCompletion'] as int?,
-      itemRewards: (json['itemRewards'] as List<dynamic>?)
-          ?.map((item) => item as Map<String, dynamic>)
-          .toList(),
+      hpCostOnCompletion: (json['hpCostOnCompletion'] as num?)?.toInt(),
+      itemRewards: itemRewards,
     );
   }
 }

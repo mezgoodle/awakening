@@ -1,66 +1,69 @@
 import 'dart:math';
-import 'dart:async';
-
-import 'package:awakening/models/item_model.dart';
-import 'package:awakening/models/system_message_model.dart';
-import 'package:awakening/providers/item_provider.dart';
-import 'package:awakening/providers/quest_provider.dart';
-import 'package:awakening/services/cloud_logger_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import '../models/player_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/item_model.dart';
+import '../models/player_model.dart';
 import '../models/quest_model.dart';
-import 'system_log_provider.dart';
-import 'skill_provider.dart';
 import '../models/skill_model.dart';
+import '../models/system_message_model.dart';
+import '../repositories/player_repository.dart';
+import '../services/app_logger_service.dart';
+import 'item_provider.dart';
+import 'quest_provider.dart';
+import 'skill_provider.dart';
+import 'system_log_provider.dart';
 
 class PlayerProvider with ChangeNotifier {
   PlayerModel? _player;
   bool _isLoading = true;
-  bool _justLeveledUp = false;
+  bool _hasLevelUpEvent = false;
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final PlayerRepository _playerRepository;
   final FirebaseAuth? _auth;
   String? _uid;
 
-  final CloudLoggerService _logger = CloudLoggerService();
+  final AppLoggerService _logger = AppLoggerService();
 
   Map<PlayerStat, int>? _modifiedStats;
-  final Map<String, DateTime> _skillCooldowns = {};
   int? _modifiedMaxHp;
   int? _modifiedMaxMp;
+  double _xpMultiplier = 1.0;
+  double _mpCostReduction = 0.0;
+  double _cooldownReduction = 0.0;
+
+  SkillProvider? _skillProvider;
+  ItemProvider? _itemProvider;
 
   Map<PlayerStat, int> get finalStats => _modifiedStats ?? player.stats;
   int get finalMaxHp => _modifiedMaxHp ?? player.maxHp;
   int get finalMaxMp => _modifiedMaxMp ?? player.maxMp;
-
-  SkillProvider? _skillProvider;
-
-  ItemProvider? _itemProvider;
+  double get xpMultiplier => _xpMultiplier;
 
   PlayerModel get player {
     _player ??= PlayerModel();
     return _player!;
   }
 
-  String? getUserId() {
-    return _uid;
-  }
-
+  String? getUserId() => _uid;
   bool get isLoading => _isLoading;
-  bool get justLeveledUp {
-    if (_justLeveledUp) {
-      _justLeveledUp = false;
+
+  bool consumeLevelUpEvent() {
+    if (_hasLevelUpEvent) {
+      _hasLevelUpEvent = false;
       return true;
     }
     return false;
   }
 
-  PlayerProvider(this._auth, SkillProvider? skillProvider, this._itemProvider,
-      PlayerModel? initialPlayer) {
-    _skillProvider = skillProvider;
-    _player = initialPlayer;
+  PlayerProvider(
+    this._auth,
+    SkillProvider? skillProvider,
+    this._itemProvider,
+    PlayerModel? initialPlayer, {
+    PlayerRepository? playerRepository,
+  })  : _playerRepository = playerRepository ?? PlayerRepository(),
+        _skillProvider = skillProvider,
+        _player = initialPlayer {
     _uid = _auth?.currentUser?.uid;
     if (_uid != null) {
       _loadPlayerData();
@@ -73,12 +76,14 @@ class PlayerProvider with ChangeNotifier {
     FirebaseAuth? auth,
     SkillProvider? skillProvider,
     ItemProvider? itemProvider,
-    PlayerModel? newPlayer,
   ) {
+    final prevSkillLoading = _skillProvider?.isLoading;
     _skillProvider = skillProvider;
     _itemProvider = itemProvider;
-    if (auth?.currentUser?.uid != _uid) {
-      _uid = auth?.currentUser?.uid;
+
+    final newUid = auth?.currentUser?.uid;
+    if (newUid != _uid) {
+      _uid = newUid;
       if (_uid != null) {
         _isLoading = true;
         notifyListeners();
@@ -88,68 +93,62 @@ class PlayerProvider with ChangeNotifier {
         _isLoading = false;
         notifyListeners();
       }
+    } else if (prevSkillLoading == true &&
+        skillProvider != null &&
+        !skillProvider.isLoading &&
+        _player != null) {
+      // Recalculate stats once skills catalog has finished loading
+      _calculateFinalStats();
+      notifyListeners();
     }
   }
 
-  DocumentReference? get _playerDocRef {
-    if (_uid == null) return null;
-    return _firestore.collection('players').doc(_uid);
-  }
-
   DateTime? getSkillCooldownEndTime(String skillId) {
-    return _skillCooldowns[skillId];
+    if (_player == null) return null;
+    final endTimeStr = _player!.skillCooldowns[skillId];
+    if (endTimeStr == null) return null;
+    return DateTime.tryParse(endTimeStr);
   }
 
   Future<void> _loadPlayerData() async {
-    if (_playerDocRef == null) {
+    if (_uid == null) {
       _isLoading = false;
       notifyListeners();
       return;
     }
 
     try {
-      DocumentSnapshot playerSnapshot = await _playerDocRef!.get();
-      if (playerSnapshot.exists && playerSnapshot.data() != null) {
-        _player = PlayerModel.fromJson(
-            playerSnapshot.data()! as Map<String, dynamic>);
+      final loaded = await _playerRepository.fetchPlayer(_uid!);
+      if (loaded != null) {
+        _player = loaded;
         _logger.writeLog(
-            message: "Player data for UID $_uid loaded from Firestore.",
-            payload: {
-              "context": {
-                "user": {
-                  "playerName": _player!.playerName,
-                  "level": _player!.level,
-                  "xp": _player!.xp,
-                }
-              }
-            });
+          message: "Player data for UID $_uid loaded.",
+          payload: {
+            "name": _player!.playerName,
+            "level": _player!.level,
+            "xp": _player!.xp,
+          },
+        );
       } else {
         _player = PlayerModel();
         _logger.writeLog(
-            message:
-                "No player data in Firestore for UID $_uid, creating new player.",
-            payload: {
-              "context": {
-                "id": _uid,
-                "user": {
-                  "playerName": _player!.playerName,
-                  "level": _player!.level,
-                  "xp": _player!.xp,
-                }
-              }
-            });
+          message: "No existing player in Firestore for UID $_uid. Created initial profile.",
+        );
         await _savePlayerData();
       }
-    } catch (e) {
+    } catch (e, stack) {
       _logger.writeLog(
-          message:
-              "Error loading player data from Firestore: $e. Creating new player.",
-          severity: CloudLogSeverity.warning);
+        message: "Error loading player data: $e",
+        severity: LogSeverity.warning,
+        error: e,
+        stackTrace: stack,
+      );
       _player = PlayerModel();
       await _savePlayerData();
     }
 
     if (_player != null) {
+      _cleanExpiredBuffsAndCooldowns();
       _calculateFinalStats();
     }
 
@@ -157,71 +156,93 @@ class PlayerProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void _cleanExpiredBuffsAndCooldowns() {
+    if (_player == null) return;
+    final now = DateTime.now();
+
+    _player!.activeBuffs.removeWhere((skillId, endTimeString) {
+      final endTime = DateTime.tryParse(endTimeString);
+      return endTime == null || endTime.isBefore(now);
+    });
+
+    _player!.skillCooldowns.removeWhere((skillId, endTimeString) {
+      final endTime = DateTime.tryParse(endTimeString);
+      return endTime == null || endTime.isBefore(now);
+    });
+  }
+
   void _calculateFinalStats() {
-    if (_player == null || _skillProvider == null) return;
+    if (_player == null) return;
+    _cleanExpiredBuffsAndCooldowns();
 
     _modifiedStats = Map.from(_player!.stats);
     double maxHpMultiplier = 1.0;
     double maxMpMultiplier = 1.0;
+    _xpMultiplier = 1.0;
+    _mpCostReduction = 0.0;
+    _cooldownReduction = 0.0;
 
-    for (String skillId in _player!.learnedSkillIds) {
-      final skill = _skillProvider!.getSkillById(skillId);
-      if (skill != null && skill.skillType == SkillType.passive) {
-        skill.effects.forEach((effectType, value) {
-          switch (effectType) {
-            case SkillEffectType.addStrength:
-              _modifiedStats![PlayerStat.strength] =
-                  (_modifiedStats![PlayerStat.strength] ?? 0) + value.toInt();
-              break;
-            case SkillEffectType.addStamina:
-              _modifiedStats![PlayerStat.stamina] =
-                  (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
-              break;
-            case SkillEffectType.multiplyMaxHp:
-              maxHpMultiplier *= (1 + value / 100.0);
-              break;
-            case SkillEffectType.multiplyMaxMp:
-              maxMpMultiplier *= (1 + value / 100.0);
-              break;
-            default:
-              break;
-          }
-        });
+    void applyEffect(SkillEffectType effectType, double value) {
+      switch (effectType) {
+        case SkillEffectType.addStrength:
+          _modifiedStats![PlayerStat.strength] =
+              (_modifiedStats![PlayerStat.strength] ?? 0) + value.toInt();
+          break;
+        case SkillEffectType.addAgility:
+          _modifiedStats![PlayerStat.agility] =
+              (_modifiedStats![PlayerStat.agility] ?? 0) + value.toInt();
+          break;
+        case SkillEffectType.addIntelligence:
+          _modifiedStats![PlayerStat.intelligence] =
+              (_modifiedStats![PlayerStat.intelligence] ?? 0) + value.toInt();
+          break;
+        case SkillEffectType.addPerception:
+          _modifiedStats![PlayerStat.perception] =
+              (_modifiedStats![PlayerStat.perception] ?? 0) + value.toInt();
+          break;
+        case SkillEffectType.addStamina:
+          _modifiedStats![PlayerStat.stamina] =
+              (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
+          break;
+        case SkillEffectType.multiplyMaxHp:
+          maxHpMultiplier *= (1.0 + value / 100.0);
+          break;
+        case SkillEffectType.multiplyMaxMp:
+          maxMpMultiplier *= (1.0 + value / 100.0);
+          break;
+        case SkillEffectType.multiplyXpGain:
+          _xpMultiplier *= (1.0 + value / 100.0);
+          break;
+        case SkillEffectType.reduceMpCost:
+          _mpCostReduction = min(0.9, _mpCostReduction + (value / 100.0));
+          break;
+        case SkillEffectType.reduceCooldown:
+          _cooldownReduction = min(0.9, _cooldownReduction + (value / 100.0));
+          break;
       }
     }
 
-    _player!.activeBuffs.removeWhere((skillId, endTimeString) {
-      return DateTime.parse(endTimeString).isBefore(DateTime.now());
-    });
+    if (_skillProvider != null && !_skillProvider!.isLoading) {
+      // 1. Passive skills
+      for (final skillId in _player!.learnedSkillIds) {
+        final skill = _skillProvider!.getSkillById(skillId);
+        if (skill != null && skill.skillType == SkillType.passive) {
+          skill.effects.forEach(applyEffect);
+        }
+      }
 
-    for (String skillId in _player!.activeBuffs.keys) {
-      final skill = _skillProvider!.getSkillById(skillId);
-      if (skill != null && skill.skillType == SkillType.activeBuff) {
-        skill.effects.forEach((effectType, value) {
-          switch (effectType) {
-            case SkillEffectType.addStrength:
-              _modifiedStats![PlayerStat.strength] =
-                  (_modifiedStats![PlayerStat.strength] ?? 0) + value.toInt();
-              break;
-            case SkillEffectType.addStamina:
-              _modifiedStats![PlayerStat.stamina] =
-                  (_modifiedStats![PlayerStat.stamina] ?? 0) + value.toInt();
-              break;
-            case SkillEffectType.multiplyMaxHp:
-              maxHpMultiplier *= (1 + value / 100.0);
-              break;
-            case SkillEffectType.multiplyMaxMp:
-              maxMpMultiplier *= (1 + value / 100.0);
-              break;
-            default:
-              break;
-          }
-        });
+      // 2. Active buffs
+      for (final skillId in _player!.activeBuffs.keys) {
+        final skill = _skillProvider!.getSkillById(skillId);
+        if (skill != null && skill.skillType == SkillType.activeBuff) {
+          skill.effects.forEach(applyEffect);
+        }
       }
     }
 
-    int stamina = _modifiedStats![PlayerStat.stamina] ?? 0;
-    int intelligence = _modifiedStats![PlayerStat.intelligence] ?? 0;
+    final int stamina = _modifiedStats![PlayerStat.stamina] ?? 0;
+    final int intelligence = _modifiedStats![PlayerStat.intelligence] ?? 0;
+
     _modifiedMaxHp = (((_player!.level * PlayerModel.baseHpPerLevel) +
                 (stamina * PlayerModel.hpPerStaminaPoint) +
                 50) *
@@ -238,54 +259,32 @@ class PlayerProvider with ChangeNotifier {
   }
 
   Future<void> _savePlayerData() async {
-    if (_playerDocRef == null || _player == null) {
-      _logger.writeLog(
-        message:
-            "Player data not ready for saving yet (no UID or player model).",
-        severity: CloudLogSeverity.warning,
-      );
-      return;
-    }
+    if (_uid == null || _player == null) return;
     try {
-      await _playerDocRef!.set(_player!.toJson());
+      await _playerRepository.savePlayer(_uid!, _player!);
+    } catch (e, stack) {
       _logger.writeLog(
-        message: "Player data for UID $_uid saved to Firestore.",
-        payload: {
-          "context": {
-            "id": _uid,
-            "user": {
-              "playerName": _player!.playerName,
-              "level": _player!.level,
-              "xp": _player!.xp,
-            }
-          }
-        },
-      );
-    } catch (e) {
-      _logger.writeLog(
-        message: "Error saving player data to Firestore: $e",
-        severity: CloudLogSeverity.error,
-        payload: {
-          "context": {"id": _uid, "error": e.toString()},
-        },
+        message: "Error saving player data: $e",
+        severity: LogSeverity.error,
+        error: e,
+        stackTrace: stack,
       );
     }
   }
 
   void addXp(int amount, SystemLogProvider slog) {
     if (_isLoading || _player == null) return;
-    _player!.xp += amount;
+    final int effectiveXp = (amount * _xpMultiplier).round();
+    _player!.xp += effectiveXp;
     _checkLevelUp(slog);
     _savePlayerData();
-    if (_justLeveledUp || amount > 0) {
-      notifyListeners();
-    }
+    notifyListeners();
   }
 
   void _checkLevelUp(SystemLogProvider? slog) {
     if (_player == null) return;
     bool leveledUpThisCheck = false;
-    int oldAvailablePoints = _player!.availableStatPoints;
+    final int oldAvailablePoints = _player!.availableStatPoints;
 
     while (_player!.xp >= _player!.xpToNextLevel) {
       _player!.xp -= _player!.xpToNextLevel;
@@ -300,16 +299,20 @@ class PlayerProvider with ChangeNotifier {
     }
 
     if (leveledUpThisCheck) {
-      _justLeveledUp = true;
+      _hasLevelUpEvent = true;
       _player!.onLevelUp();
       _calculateFinalStats();
 
       slog?.addMessage(
-          "Level up! New level: ${_player!.level}", MessageType.levelUp);
-      int pointsGained = _player!.availableStatPoints - oldAvailablePoints;
+        "Level up! Reached Level ${_player!.level}!",
+        MessageType.levelUp,
+      );
+      final int pointsGained = _player!.availableStatPoints - oldAvailablePoints;
       if (pointsGained > 0) {
         slog?.addMessage(
-            "Received $pointsGained stat points!", MessageType.statsIncreased);
+          "Gained $pointsGained stat points!",
+          MessageType.statsIncreased,
+        );
       }
     }
   }
@@ -322,7 +325,9 @@ class PlayerProvider with ChangeNotifier {
 
     if (_player!.learnedSkillIds.contains(skillId)) {
       slog.addMessage(
-          "Skill '${skill.name}' is already learned.", MessageType.warning);
+        "Skill '${skill.name}' is already learned.",
+        MessageType.warning,
+      );
       return false;
     }
 
@@ -339,8 +344,10 @@ class PlayerProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } else {
-      slog.addMessage("Not enough skill points to learn '${skill.name}'.",
-          MessageType.warning);
+      slog.addMessage(
+        "Requirements not met to learn '${skill.name}'.",
+        MessageType.warning,
+      );
       return false;
     }
   }
@@ -350,37 +357,50 @@ class PlayerProvider with ChangeNotifier {
 
     final skill = _skillProvider!.getSkillById(skillId);
     if (skill == null || skill.skillType != SkillType.activeBuff) return false;
-
     if (!_player!.learnedSkillIds.contains(skillId)) return false;
+
+    _cleanExpiredBuffsAndCooldowns();
 
     if (_player!.activeBuffs.containsKey(skillId)) {
       slog.addMessage(
-          "Skill '${skill.name}' is already active.", MessageType.warning);
+        "Skill '${skill.name}' is already active.",
+        MessageType.warning,
+      );
       return false;
     }
 
-    final cooldownEndTime = _skillCooldowns[skillId];
+    final cooldownEndTime = getSkillCooldownEndTime(skillId);
     if (cooldownEndTime != null && cooldownEndTime.isAfter(DateTime.now())) {
       slog.addMessage(
-          "Skill '${skill.name}' is on cooldown.", MessageType.warning);
+        "Skill '${skill.name}' is still on cooldown.",
+        MessageType.warning,
+      );
       return false;
     }
 
-    final mpCost = skill.mpCost?.toInt() ?? 0;
-    if (_player!.currentMp < mpCost) {
+    final baseMpCost = skill.mpCost?.toInt() ?? 0;
+    final effectiveMpCost = (baseMpCost * (1.0 - _mpCostReduction)).round();
+
+    if (_player!.currentMp < effectiveMpCost) {
       slog.addMessage(
-          "Not enough MP to activate '${skill.name}'.", MessageType.warning);
+        "Not enough MP to activate '${skill.name}'.",
+        MessageType.warning,
+      );
       return false;
     }
 
-    _player!.useMp(mpCost);
+    _player!.useMp(effectiveMpCost);
 
-    final buffEndTime =
-        DateTime.now().add(skill.duration ?? const Duration(seconds: 0));
+    final buffDuration = skill.duration ?? const Duration(seconds: 0);
+    final buffEndTime = DateTime.now().add(buffDuration);
     _player!.activeBuffs[skillId] = buffEndTime.toIso8601String();
 
     if (skill.cooldown != null) {
-      _skillCooldowns[skillId] = DateTime.now().add(skill.cooldown!);
+      final effectiveCooldownSeconds =
+          (skill.cooldown!.inSeconds * (1.0 - _cooldownReduction)).round();
+      final cooldownEndTime =
+          DateTime.now().add(Duration(seconds: effectiveCooldownSeconds));
+      _player!.skillCooldowns[skillId] = cooldownEndTime.toIso8601String();
     }
 
     slog.addMessage("Activated skill: '${skill.name}'!", MessageType.info);
@@ -402,13 +422,14 @@ class PlayerProvider with ChangeNotifier {
         _player!.onStatsChanged();
       }
       slog.addMessage(
-          "${PlayerModel.getStatName(stat)} increased by $amountToSpend. New value: ${_player!.stats[stat]}",
-          MessageType.statsIncreased);
+        "${PlayerModel.getStatName(stat)} increased by $amountToSpend. Total: ${_player!.stats[stat]}",
+        MessageType.statsIncreased,
+      );
       _savePlayerData();
       notifyListeners();
       return true;
     }
-    slog.addMessage("Not enough stat points.", MessageType.warning);
+    slog.addMessage("Not enough stat points available.", MessageType.warning);
     return false;
   }
 
@@ -420,135 +441,126 @@ class PlayerProvider with ChangeNotifier {
   }
 
   void updateBaselinePerformance(Map<PhysicalActivity, dynamic> performance) {
-    if (_isLoading) return;
+    if (_isLoading || _player == null) return;
     _player!.baselinePhysicalPerformance = Map.from(performance);
     _savePlayerData();
     notifyListeners();
   }
 
   void takePlayerDamage(int amount) {
-    if (_isLoading) return;
+    if (_isLoading || _player == null) return;
     _player!.takeDamage(amount);
     _savePlayerData();
     notifyListeners();
   }
 
   void restorePlayerHp(int amount) {
-    if (_isLoading) return;
-    _player!.restoreHp(amount);
+    if (_isLoading || _player == null) return;
+    _player!.restoreHp(amount, maxAllowedHp: finalMaxHp);
     _savePlayerData();
     notifyListeners();
   }
 
   void usePlayerMp(int amount) {
-    if (_isLoading) return;
+    if (_isLoading || _player == null) return;
     _player!.useMp(amount);
     _savePlayerData();
     notifyListeners();
   }
 
   void restorePlayerMp(int amount) {
-    if (_isLoading) return;
-    _player!.restoreMp(amount);
+    if (_isLoading || _player == null) return;
+    _player!.restoreMp(amount, maxAllowedMp: finalMaxMp);
     _savePlayerData();
     notifyListeners();
   }
 
   Future<void> resetPlayerData() async {
-    if (_playerDocRef != null) {
+    if (_uid != null) {
       try {
-        await _playerDocRef!.delete();
-        _logger.writeLog(
-          message: "Player document for UID $_uid deleted from Firestore.",
-          payload: {
-            "message": "Player data reset",
-            "context": {"id": _uid}
-          },
-        );
+        await _playerRepository.deletePlayer(_uid!);
       } catch (e) {
         _logger.writeLog(
           message: "Error deleting player document: $e",
-          severity: CloudLogSeverity.error,
-          payload: {
-            "message": "Error deleting player document",
-            "context": {"id": _uid, "error": e.toString()},
-          },
+          severity: LogSeverity.error,
         );
       }
     }
     _player = PlayerModel();
     _isLoading = false;
-    _justLeveledUp = false;
+    _hasLevelUpEvent = false;
     await _savePlayerData();
+    _calculateFinalStats();
     notifyListeners();
-    _logger.writeLog(
-      message: "Player data has been reset in Firestore.",
-      payload: {
-        "message": "Player data reset",
-        "context": {"id": _uid}
-      },
-    );
   }
 
   void awardNewRank(QuestDifficulty newRank, SystemLogProvider slog) {
-    if (_player!.playerRank.index < newRank.index) {
+    if (_player != null && _player!.playerRank.index < newRank.index) {
       _player!.playerRank = newRank;
       slog.addMessage(
-          "Rank up! New rank: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
-          MessageType.rankUp);
+        "Rank upgraded! New Rank: ${QuestModel.getQuestDifficultyName(_player!.playerRank)}",
+        MessageType.rankUp,
+      );
       _savePlayerData();
       notifyListeners();
     }
   }
 
-  Future<bool> requestRankUpChallenge(QuestProvider questProvider,
-      SystemLogProvider slog, PlayerProvider playerProvider) async {
-    if (_isLoading) return false;
+  Future<bool> requestRankUpChallenge(
+      QuestProvider questProvider, SystemLogProvider slog) async {
+    if (_isLoading || _player == null) return false;
 
-    QuestDifficulty currentRank = _player!.playerRank;
-    QuestDifficulty nextPotentialRankByLevel =
+    final QuestDifficulty currentRank = _player!.playerRank;
+    final QuestDifficulty nextPotentialRank =
         PlayerModel.calculateRankByLevel(_player!.level);
-    bool hasActiveRankUpQuest = questProvider.activeQuests
+    final bool hasActiveRankUpQuest = questProvider.activeQuests
         .any((q) => q.type == QuestType.rankUpChallenge);
 
-    if (nextPotentialRankByLevel.index > currentRank.index &&
-        !hasActiveRankUpQuest) {
+    if (nextPotentialRank.index > currentRank.index && !hasActiveRankUpQuest) {
       final nextIndex =
           min(currentRank.index + 1, QuestDifficulty.values.length - 1);
       final targetRankForChallenge = QuestDifficulty.values[nextIndex];
 
-      if (targetRankForChallenge.index > nextPotentialRankByLevel.index) {
+      if (targetRankForChallenge.index > nextPotentialRank.index) {
         slog.addMessage(
-            "Level ${player.level} is not enough for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}.",
-            MessageType.info);
+          "Level ${_player!.level} is not sufficient for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Rank challenge.",
+          MessageType.info,
+        );
         return false;
       }
 
       slog.addMessage(
-          "Requesting rank up challenge for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Rank...",
-          MessageType.info);
+        "Requesting Rank Up Challenge for ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Rank...",
+        MessageType.info,
+      );
 
       if (_itemProvider != null) {
         await questProvider.fetchAndAddGeneratedQuest(
-            playerProvider: playerProvider,
-            itemProvider: _itemProvider!,
-            slog: slog,
-            questType: QuestType.rankUpChallenge,
-            customInstruction:
-                "It is very important Rank challenge for ${playerProvider.player.playerName} (Level: ${playerProvider.player.level}, Current Rank: ${QuestModel.getQuestDifficultyName(currentRank)}) to ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Rank. Завдання має бути унікальним, складним (відповідати рангу ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}), епічним та перевіряти навички мисливця. Наприклад, перемогти міні-боса, зачистити невелике підземелля (описово), знайти рідкісний артефакт або врятувати когось. Вкажи в описі, що це офіційне випробування від Асоціації Мисливців (або аналогічної організації в світі Solo Leveling).");
+          playerProvider: this,
+          itemProvider: _itemProvider!,
+          slog: slog,
+          questType: QuestType.rankUpChallenge,
+          customInstruction:
+              "Official Hunter Association Rank Promotion Trial for ${_player!.playerName} from ${QuestModel.getQuestDifficultyName(currentRank)}-Rank to ${QuestModel.getQuestDifficultyName(targetRankForChallenge)}-Rank. Epic, demanding, and definitive test of Hunter competence.",
+        );
         return true;
       } else {
-        slog.addMessage("ItemProvider недоступний для створення квесту.",
-            MessageType.error);
+        slog.addMessage(
+          "Item catalog unavailable to generate challenge.",
+          MessageType.error,
+        );
         return false;
       }
     } else if (hasActiveRankUpQuest) {
       slog.addMessage(
-          "У вас вже є активне Рангове Випробування!", MessageType.info);
+        "You already have an active Rank Up Challenge!",
+        MessageType.info,
+      );
     } else {
       slog.addMessage(
-          "Умови для наступного Рангового Випробування ще не виконані (Рівень: ${player.level}, Поточний ранг: ${player.playerRank.name}, Макс. ранг за рівнем: ${nextPotentialRankByLevel.name}).",
-          MessageType.info);
+        "Requirements for the next Rank Up Challenge are not yet met (Level: ${_player!.level}, Current Rank: ${_player!.playerRank.name}).",
+        MessageType.info,
+      );
     }
     return false;
   }
@@ -557,39 +569,26 @@ class PlayerProvider with ChangeNotifier {
     if (_player == null || _itemProvider == null) return;
 
     final templateItem = _itemProvider!.getItemById(itemId);
-    if (templateItem == null) {
-      _logger.writeLog(
-        message: "Attempted to add non-existent item: $itemId",
-        severity: CloudLogSeverity.warning,
-        payload: {
-          "message": "Attempted to add non-existent item",
-          "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
-        },
+    final isStackable = templateItem?.isStackable ?? true;
+
+    final existingIndex = _player!.inventory.indexWhere(
+        (entry) => entry.itemId == itemId && isStackable);
+
+    if (existingIndex != -1) {
+      final existing = _player!.inventory[existingIndex];
+      _player!.inventory[existingIndex] = QuestItemReward(
+        itemId: itemId,
+        quantity: existing.quantity + quantity,
       );
-      return;
-    }
-
-    // Шукаємо, чи є вже такий предмет в інвентарі (якщо він stackable)
-    final existingItemIndex = _player!.inventory.indexWhere(
-        (item) => item['itemId'] == itemId && templateItem.isStackable);
-
-    if (existingItemIndex != -1) {
-      final existingItemData = _player!.inventory[existingItemIndex];
-      final newQuantity = (existingItemData['quantity'] as int) + quantity;
-      _player!.inventory[existingItemIndex] = {
-        'itemId': itemId,
-        'quantity': newQuantity
-      };
     } else {
-      _player!.inventory.add({'itemId': itemId, 'quantity': quantity});
+      _player!.inventory.add(QuestItemReward(
+        itemId: itemId,
+        quantity: quantity,
+      ));
     }
 
     _logger.writeLog(
-      message: "Added $quantity x $itemId to inventory for player $_uid.",
-      payload: {
-        "message": "Item added to inventory",
-        "context": {"itemId": itemId, "quantity": quantity, "playerId": _uid}
-      },
+      message: "Added $quantity x $itemId to player inventory.",
     );
     _savePlayerData();
     notifyListeners();
@@ -599,44 +598,52 @@ class PlayerProvider with ChangeNotifier {
     if (_player == null || _itemProvider == null) return;
 
     final itemIndex =
-        _player!.inventory.indexWhere((item) => item['itemId'] == itemId);
+        _player!.inventory.indexWhere((entry) => entry.itemId == itemId);
     if (itemIndex == -1) return;
 
     final templateItem = _itemProvider!.getItemById(itemId);
     if (templateItem == null) return;
 
-    // Застосовуємо ефекти
     bool itemUsed = false;
     templateItem.effects.forEach((effect, value) {
       switch (effect) {
         case ItemEffectType.restoreHp:
           restorePlayerHp(value.toInt());
           itemUsed = true;
-          slog.addMessage("Відновлено ${value.toInt()} HP.", MessageType.info);
+          slog.addMessage("Restored ${value.toInt()} HP.", MessageType.info);
           break;
         case ItemEffectType.restoreMp:
           restorePlayerMp(value.toInt());
           itemUsed = true;
-          slog.addMessage("Відновлено ${value.toInt()} MP.", MessageType.info);
+          slog.addMessage("Restored ${value.toInt()} MP.", MessageType.info);
           break;
-        // ... інші ефекти
-        default:
+        case ItemEffectType.restoreHpPercent:
+          final amount = (finalMaxHp * (value / 100.0)).round();
+          restorePlayerHp(amount);
+          itemUsed = true;
+          slog.addMessage(
+              "Restored $amount HP (${value.toInt()}%).", MessageType.info);
+          break;
+        case ItemEffectType.restoreMpPercent:
+          final amount = (finalMaxMp * (value / 100.0)).round();
+          restorePlayerMp(amount);
+          itemUsed = true;
+          slog.addMessage(
+              "Restored $amount MP (${value.toInt()}%).", MessageType.info);
           break;
       }
     });
 
-    // Якщо предмет був використаний (витратний матеріал), зменшуємо кількість
     if (itemUsed && templateItem.type == ItemType.potion) {
-      final itemData = _player!.inventory[itemIndex];
-      final newQuantity = (itemData['quantity'] as int) - 1;
-
+      final currentEntry = _player!.inventory[itemIndex];
+      final newQuantity = currentEntry.quantity - 1;
       if (newQuantity <= 0) {
         _player!.inventory.removeAt(itemIndex);
       } else {
-        _player!.inventory[itemIndex] = {
-          'itemId': itemId,
-          'quantity': newQuantity
-        };
+        _player!.inventory[itemIndex] = QuestItemReward(
+          itemId: itemId,
+          quantity: newQuantity,
+        );
       }
     }
 
