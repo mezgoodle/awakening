@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../providers/skill_provider.dart';
 
 class ActiveBuffChip extends StatefulWidget {
@@ -42,7 +41,7 @@ class _ActiveBuffChipState extends State<ActiveBuffChip> {
   }
 
   bool _updateRemainingTime() {
-    final endTime = DateTime.parse(widget.endTimeString);
+    final endTime = DateTime.tryParse(widget.endTimeString) ?? DateTime.now();
     final remaining = endTime.difference(DateTime.now());
     _remainingTime = remaining.isNegative ? Duration.zero : remaining;
     return remaining.isNegative;
@@ -57,22 +56,25 @@ class _ActiveBuffChipState extends State<ActiveBuffChip> {
   @override
   Widget build(BuildContext context) {
     final skill = context.read<SkillProvider>().getSkillById(widget.skillId);
-    if (skill == null) {
-      return const SizedBox.shrink();
-    }
+    if (skill == null) return const SizedBox.shrink();
 
     final minutes = _remainingTime.inMinutes.toString();
     final seconds = (_remainingTime.inSeconds % 60).toString().padLeft(2, '0');
 
     return Chip(
-      avatar: const Icon(Icons.arrow_upward_rounded,
-          color: Colors.greenAccent, size: 18),
+      avatar: const Icon(
+        Icons.arrow_upward_rounded,
+        color: Colors.greenAccent,
+        size: 18,
+      ),
       label: Text(
         '${skill.name} ($minutes:$seconds)',
-        style:
-            const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
       ),
-      backgroundColor: Colors.white.withOpacity(0.15),
+      backgroundColor: Colors.white.withValues(alpha: 0.15),
       shape: const StadiumBorder(side: BorderSide(color: Colors.white24)),
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
     );

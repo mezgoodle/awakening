@@ -1,5 +1,6 @@
 import 'dart:math';
-
+import 'package:flutter/foundation.dart';
+import 'item_model.dart';
 import 'quest_model.dart';
 
 enum PlayerStat {
@@ -28,6 +29,8 @@ class PlayerModel {
   List<String> learnedSkillIds;
   Map<PhysicalActivity, dynamic>? baselinePhysicalPerformance;
   Map<String, String> activeBuffs;
+  Map<String, String> skillCooldowns;
+  String? lastDailyQuestGenerationDate;
   late QuestDifficulty playerRank;
 
   late int maxHp;
@@ -40,7 +43,7 @@ class PlayerModel {
   static const int baseMpPerLevel = 5;
   static const int mpPerIntelligencePoint = 3;
 
-  List<Map<String, dynamic>> inventory;
+  List<QuestItemReward> inventory;
 
   PlayerModel({
     this.playerName = "Hunter",
@@ -48,6 +51,8 @@ class PlayerModel {
     this.xp = 0,
     Map<PlayerStat, int>? initialStats,
     Map<String, String>? initialActiveBuffs,
+    Map<String, String>? initialSkillCooldowns,
+    this.lastDailyQuestGenerationDate,
     this.availableStatPoints = 0,
     this.availableSkillPoints = 0,
     this.baselinePhysicalPerformance,
@@ -55,9 +60,10 @@ class PlayerModel {
     int? loadedCurrentHp,
     int? loadedCurrentMp,
     List<String>? initialLearnedSkillIds,
-    List<Map<String, dynamic>>? initialInventory,
+    List<QuestItemReward>? initialInventory,
   })  : learnedSkillIds = initialLearnedSkillIds ?? [],
         activeBuffs = initialActiveBuffs ?? {},
+        skillCooldowns = initialSkillCooldowns ?? {},
         inventory = initialInventory ?? [],
         stats = initialStats ??
             {
@@ -68,7 +74,6 @@ class PlayerModel {
               PlayerStat.stamina: 5,
             } {
     xpToNextLevel = calculateXpForLevel(level);
-
     _calculateAndUpdateHpMp();
 
     currentHp = loadedCurrentHp ?? maxHp;
@@ -79,8 +84,8 @@ class PlayerModel {
   }
 
   void _calculateAndUpdateHpMp() {
-    int stamina = stats[PlayerStat.stamina] ?? 0;
-    int intelligence = stats[PlayerStat.intelligence] ?? 0;
+    final int stamina = stats[PlayerStat.stamina] ?? 0;
+    final int intelligence = stats[PlayerStat.intelligence] ?? 0;
 
     maxHp = (level * baseHpPerLevel) + (stamina * hpPerStaminaPoint) + 50;
     maxMp =
@@ -94,11 +99,11 @@ class PlayerModel {
   }
 
   void onStatsChanged() {
-    int oldMaxHp = maxHp;
-    int oldMaxMp = maxMp;
+    final int oldMaxHp = maxHp;
+    final int oldMaxMp = maxMp;
     _calculateAndUpdateHpMp();
-    double hpPercentage = (oldMaxHp > 0) ? currentHp / oldMaxHp : 1.0;
-    double mpPercentage = (oldMaxMp > 0) ? currentMp / oldMaxMp : 1.0;
+    final double hpPercentage = (oldMaxHp > 0) ? currentHp / oldMaxHp : 1.0;
+    final double mpPercentage = (oldMaxMp > 0) ? currentMp / oldMaxMp : 1.0;
     currentHp = (maxHp * hpPercentage).round().clamp(0, maxHp);
     currentMp = (maxMp * mpPercentage).round().clamp(0, maxMp);
   }
@@ -107,16 +112,18 @@ class PlayerModel {
     currentHp = max(0, currentHp - amount);
   }
 
-  void restoreHp(int amount) {
-    currentHp = min(maxHp, currentHp + amount);
+  void restoreHp(int amount, {int? maxAllowedHp}) {
+    final effectiveMax = maxAllowedHp ?? maxHp;
+    currentHp = min(effectiveMax, currentHp + amount);
   }
 
   void useMp(int amount) {
     currentMp = max(0, currentMp - amount);
   }
 
-  void restoreMp(int amount) {
-    currentMp = min(maxMp, currentMp + amount);
+  void restoreMp(int amount, {int? maxAllowedMp}) {
+    final effectiveMax = maxAllowedMp ?? maxMp;
+    currentMp = min(effectiveMax, currentMp + amount);
   }
 
   static QuestDifficulty calculateRankByLevel(int level) {
@@ -130,8 +137,7 @@ class PlayerModel {
   }
 
   static int calculateXpForLevel(int level) {
-    if (level <= 0) return 100;
-    if (level == 1) return 100;
+    if (level <= 1) return 100;
     return (pow(level, 1.8) * 75 + (level - 1) * 150).round();
   }
 
@@ -164,7 +170,9 @@ class PlayerModel {
         (key, value) => MapEntry(key.name, value),
       ),
       'activeBuffs': activeBuffs,
-      'inventory': inventory,
+      'skillCooldowns': skillCooldowns,
+      'lastDailyQuestGenerationDate': lastDailyQuestGenerationDate,
+      'inventory': inventory.map((item) => item.toJson()).toList(),
       'playerRank': playerRank.name,
       'maxHp': maxHp,
       'currentHp': currentHp,
@@ -176,22 +184,21 @@ class PlayerModel {
   factory PlayerModel.fromJson(Map<String, dynamic> json) {
     Map<PlayerStat, int> loadedStats = {};
     if (json['stats'] is Map) {
-      loadedStats = (json['stats'] as Map<String, dynamic>).map(
-        (key, value) => MapEntry(
-          PlayerStat.values.byName(key),
-          value as int,
-        ),
-      );
-    } else {
-      // ignore: avoid_print
-      print(
-          "Warning: 'stats' field is missing or not a map in JSON. Using default stats.");
+      final statsMap = json['stats'] as Map<String, dynamic>;
+      for (final entry in statsMap.entries) {
+        try {
+          final stat = PlayerStat.values.byName(entry.key);
+          loadedStats[stat] = (entry.value as num).toInt();
+        } catch (_) {}
+      }
+    }
+    if (loadedStats.isEmpty) {
       loadedStats = {
         PlayerStat.strength: 5,
         PlayerStat.agility: 5,
         PlayerStat.intelligence: 5,
         PlayerStat.perception: 5,
-        PlayerStat.stamina: 5
+        PlayerStat.stamina: 5,
       };
     }
 
@@ -199,37 +206,65 @@ class PlayerModel {
     if (json['baselinePhysicalPerformance'] != null &&
         json['baselinePhysicalPerformance'] is Map) {
       try {
-        Map<String, dynamic> decodedMap =
+        final decodedMap =
             Map<String, dynamic>.from(json['baselinePhysicalPerformance']);
         loadedBaselinePerformance = decodedMap.map((key, value) =>
             MapEntry(PhysicalActivity.values.byName(key), value));
       } catch (e) {
-        // ignore: avoid_print
-        print("Error decoding baselinePhysicalPerformance from JSON: $e");
+        debugPrint("Error decoding baselinePhysicalPerformance from JSON: $e");
       }
+    }
+
+    List<QuestItemReward> loadedInventory = [];
+    if (json['inventory'] is List) {
+      for (final item in (json['inventory'] as List<dynamic>)) {
+        if (item is Map<String, dynamic>) {
+          loadedInventory.add(QuestItemReward.fromJson(item));
+        }
+      }
+    }
+
+    Map<String, String> loadedActiveBuffs = {};
+    if (json['activeBuffs'] is Map) {
+      (json['activeBuffs'] as Map<String, dynamic>).forEach((k, v) {
+        if (v != null) loadedActiveBuffs[k] = v.toString();
+      });
+    }
+
+    Map<String, String> loadedSkillCooldowns = {};
+    if (json['skillCooldowns'] is Map) {
+      (json['skillCooldowns'] as Map<String, dynamic>).forEach((k, v) {
+        if (v != null) loadedSkillCooldowns[k] = v.toString();
+      });
+    }
+
+    QuestDifficulty loadedRank = QuestDifficulty.F;
+    if (json['playerRank'] != null) {
+      try {
+        loadedRank = QuestDifficulty.values.byName(json['playerRank'] as String);
+      } catch (_) {}
     }
 
     return PlayerModel(
       playerName: json['playerName'] as String? ?? "Hunter",
-      level: json['level'] as int? ?? 1,
-      xp: json['xp'] as int? ?? 0,
+      level: (json['level'] as num?)?.toInt() ?? 1,
+      xp: (json['xp'] as num?)?.toInt() ?? 0,
       initialStats: loadedStats,
-      availableStatPoints: json['availableStatPoints'] as int? ?? 0,
-      availableSkillPoints: json['availableSkillPoints'] as int? ?? 0,
+      availableStatPoints:
+          (json['availableStatPoints'] as num?)?.toInt() ?? 0,
+      availableSkillPoints:
+          (json['availableSkillPoints'] as num?)?.toInt() ?? 0,
       initialLearnedSkillIds:
           (json['learnedSkillIds'] as List<dynamic>?)?.cast<String>() ?? [],
-      initialActiveBuffs: (json['activeBuffs'] as Map<String, dynamic>?)
-          ?.cast<String, String>(),
-      initialInventory: (json['inventory'] as List<dynamic>?)
-          ?.map((item) => Map<String, dynamic>.from(item))
-          .toList(),
-      playerRank: json['playerRank'] != null &&
-              (json['playerRank'] as String).isNotEmpty
-          ? QuestDifficulty.values.byName(json['playerRank'] as String)
-          : QuestDifficulty.F,
+      initialActiveBuffs: loadedActiveBuffs,
+      initialSkillCooldowns: loadedSkillCooldowns,
+      lastDailyQuestGenerationDate:
+          json['lastDailyQuestGenerationDate'] as String?,
+      initialInventory: loadedInventory,
+      playerRank: loadedRank,
       baselinePhysicalPerformance: loadedBaselinePerformance,
-      loadedCurrentHp: json['currentHp'] as int?,
-      loadedCurrentMp: json['currentMp'] as int?,
+      loadedCurrentHp: (json['currentHp'] as num?)?.toInt(),
+      loadedCurrentMp: (json['currentMp'] as num?)?.toInt(),
     );
   }
 }

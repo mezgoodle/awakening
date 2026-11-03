@@ -1,10 +1,10 @@
-import 'package:awakening/services/cloud_logger_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 
 import '../providers/player_provider.dart';
+import '../services/app_logger_service.dart';
 import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final CloudLoggerService _logger = CloudLoggerService();
+  final AppLoggerService _logger = AppLoggerService();
 
   @override
   void initState() {
@@ -34,29 +34,22 @@ class _SplashScreenState extends State<SplashScreen> {
         user = userCredential.user;
         _logger.writeLog(
           message: "Signed in anonymously with UID: ${user?.uid}",
-          severity: CloudLogSeverity.info,
+          severity: LogSeverity.info,
           payload: {
-            "message": "User signed in anonymously",
-            "context": {
-              "id": user?.uid,
-              "platform": defaultTargetPlatform.toString(),
-            },
+            "id": user?.uid,
+            "platform": defaultTargetPlatform.toString(),
           },
         );
       } else {
         _logger.writeLog(
           message: "User already signed in with UID: ${user.uid}",
-          severity: CloudLogSeverity.info,
-          payload: {
-            "message": "User already signed in",
-            "context": {"id": user.uid},
-          },
+          severity: LogSeverity.info,
+          payload: {"id": user.uid},
         );
       }
 
       if (user != null) {
         final playerProvider = context.read<PlayerProvider>();
-
         if (playerProvider.isLoading) {
           playerProvider.addListener(_onPlayerProviderLoaded);
         } else {
@@ -65,11 +58,12 @@ class _SplashScreenState extends State<SplashScreen> {
       } else {
         _showErrorAndStay();
       }
-    } catch (e) {
+    } catch (e, stack) {
       _logger.writeLog(
-        message: "AuthError: anonymous_sign_in_failed",
-        severity: CloudLogSeverity.error,
-        payload: {"error": e.toString()},
+        message: "AuthError: anonymous sign in failed: $e",
+        severity: LogSeverity.error,
+        error: e,
+        stackTrace: stack,
       );
       _showErrorAndStay();
     }
@@ -86,14 +80,19 @@ class _SplashScreenState extends State<SplashScreen> {
   void _navigate() {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()));
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+    );
   }
 
   void _showErrorAndStay() {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
         content: Text(
-            "Authentication error. Please check your internet connection.")));
+          "Authentication error. Please check your internet connection.",
+        ),
+      ),
+    );
   }
 
   @override
@@ -117,8 +116,12 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              'Authenticating and loading...',
-              style: TextStyle(fontSize: 16, color: Colors.white70),
+              'Awakening the System...',
+              style: TextStyle(
+                fontSize: 16,
+                letterSpacing: 1.2,
+                color: Colors.white70,
+              ),
             ),
           ],
         ),

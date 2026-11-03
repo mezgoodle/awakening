@@ -39,7 +39,7 @@ class SkillModel {
   final Duration? duration;
   final Duration? cooldown;
 
-  SkillModel({
+  const SkillModel({
     required this.id,
     required this.name,
     required this.description,
@@ -53,4 +53,48 @@ class SkillModel {
     this.duration,
     this.cooldown,
   });
+
+  factory SkillModel.fromFirestore(Map<String, dynamic> data) {
+    final statReqs = (data['statRequirements'] as Map<String, dynamic>?)?.map(
+      (key, value) => MapEntry(PlayerStat.values.byName(key), value as int),
+    );
+
+    final effects = (data['effects'] as Map<String, dynamic>?)?.map(
+      (key, value) => MapEntry(
+        SkillEffectType.values.byName(key),
+        (value as num).toDouble(),
+      ),
+    );
+
+    final duration = data['durationSeconds'] != null
+        ? Duration(seconds: (data['durationSeconds'] as num).toInt())
+        : null;
+    final cooldown = data['cooldownSeconds'] != null
+        ? Duration(seconds: (data['cooldownSeconds'] as num).toInt())
+        : null;
+    final mpCost =
+        data['mpCost'] != null ? (data['mpCost'] as num).toDouble() : null;
+
+    SkillType skillType = SkillType.passive;
+    if (data['skillType'] != null) {
+      try {
+        skillType = SkillType.values.byName(data['skillType'] as String);
+      } catch (_) {}
+    }
+
+    return SkillModel(
+      id: data['id'] as String? ?? '',
+      name: data['name'] as String? ?? 'Unknown Skill',
+      description: data['description'] as String? ?? '',
+      iconPath: data['iconPath'] as String? ?? 'assets/icons/skills/default.svg',
+      skillType: skillType,
+      levelRequirement: data['levelRequirement'] as int? ?? 1,
+      skillPointCost: data['skillPointCost'] as int? ?? 1,
+      statRequirements: statReqs ?? {},
+      effects: effects ?? {},
+      mpCost: mpCost,
+      duration: duration,
+      cooldown: cooldown,
+    );
+  }
 }

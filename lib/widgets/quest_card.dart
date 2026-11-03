@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../models/quest_model.dart';
+import 'package:provider/provider.dart';
 import '../models/player_model.dart';
+import '../models/quest_model.dart';
+import '../providers/item_provider.dart';
+import '../utils/rank_extensions.dart';
 
 class QuestCard extends StatelessWidget {
   final QuestModel quest;
@@ -12,46 +15,11 @@ class QuestCard extends StatelessWidget {
     this.onComplete,
   });
 
-  Color _getDifficultyColor(QuestDifficulty difficulty, BuildContext context) {
-    switch (difficulty) {
-      case QuestDifficulty.S:
-        return Colors.redAccent[700]!;
-      case QuestDifficulty.A:
-        return Colors.orangeAccent[700]!;
-      case QuestDifficulty.B:
-        return Colors.yellowAccent[700]!;
-      case QuestDifficulty.C:
-        return Colors.lightGreenAccent[700]!;
-      case QuestDifficulty.D:
-        return Colors.lightBlueAccent[400]!;
-      case QuestDifficulty.E:
-        return Colors.grey[500]!;
-      case QuestDifficulty.F:
-        return Colors.grey[700]!;
-    }
-  }
-
-  IconData _getQuestTypeIcon(QuestType type) {
-    switch (type) {
-      case QuestType.daily:
-        return Icons.wb_sunny_outlined;
-      case QuestType.weekly:
-        return Icons.calendar_view_week_outlined;
-      case QuestType.milestone:
-        return Icons.flag_outlined;
-      case QuestType.generated:
-        return Icons.auto_awesome_outlined;
-      case QuestType.story:
-        return Icons.menu_book_outlined;
-      default:
-        return Icons.assignment_outlined;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final difficultyColor = _getDifficultyColor(quest.difficulty, context);
+    final difficultyColor = quest.difficulty.color;
+    final itemProvider = context.read<ItemProvider>();
 
     return Card(
       shape: RoundedRectangleBorder(
@@ -67,62 +35,85 @@ class QuestCard extends StatelessWidget {
                 backgroundColor: theme.cardTheme.color,
                 title: Row(
                   children: [
-                    Icon(_getQuestTypeIcon(quest.type),
-                        color: theme.textTheme.titleLarge?.color, size: 28),
+                    Icon(
+                      quest.type.icon,
+                      color: theme.textTheme.titleLarge?.color,
+                      size: 26,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
-                        child: Text(quest.title,
-                            style: theme.textTheme.titleLarge)),
+                      child: Text(quest.title,
+                          style: theme.textTheme.titleLarge),
+                    ),
                   ],
                 ),
                 content: SingleChildScrollView(
                   child: ListBody(
                     children: <Widget>[
                       Text(
-                          'Rank: ${QuestModel.getQuestDifficultyName(quest.difficulty)}',
-                          style: TextStyle(
-                              color: difficultyColor,
-                              fontWeight: FontWeight.bold)),
+                        'Rank: ${quest.difficulty.rankName}',
+                        style: TextStyle(
+                          color: difficultyColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Text(quest.description,
                           style: theme.textTheme.bodyMedium),
                       const SizedBox(height: 12),
-                      Text('Reward:',
-                          style: theme.textTheme.bodyLarge
-                              ?.copyWith(fontWeight: FontWeight.bold)),
-                      Text('XP: ${quest.xpReward}',
+                      Text(
+                        'Rewards:',
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text('• XP: +${quest.xpReward}',
                           style: theme.textTheme.bodyMedium),
-                      if (quest.itemRewards != null) ...[
-                        const SizedBox(height: 8),
-                        Text('Items:',
-                            style: theme.textTheme.bodyLarge
-                                ?.copyWith(fontWeight: FontWeight.bold)),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: quest.itemRewards!.map((item) {
-                            return Text('${item["name"]}',
-                                style: theme.textTheme.bodyMedium);
-                          }).toList(),
-                        ),
+                      if (quest.itemRewards != null &&
+                          quest.itemRewards!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        ...quest.itemRewards!.map((reward) {
+                          final itemName = itemProvider
+                                  .getItemById(reward.itemId)
+                                  ?.name ??
+                              reward.itemId;
+                          return Text(
+                            '• Item: $itemName x${reward.quantity}',
+                            style: theme.textTheme.bodyMedium,
+                          );
+                        }),
                       ],
                       if (quest.targetStat != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                            'Focus: ${PlayerModel.getStatName(quest.targetStat!)}',
-                            style: theme.textTheme.bodyMedium),
+                          'Focus Stat: ${PlayerModel.getStatName(quest.targetStat!)}',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                      if (quest.hpCostOnCompletion != null &&
+                          quest.hpCostOnCompletion! > 0) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Exertion: -${quest.hpCostOnCompletion} HP on completion',
+                          style: TextStyle(
+                            color: Colors.redAccent[100],
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 8),
-                      Text('Type: ${QuestModel.getQuestTypeName(quest.type)}',
-                          style: theme.textTheme.bodyMedium),
+                      Text('Type: ${quest.type.displayName}',
+                          style: theme.textTheme.bodySmall),
                       if (quest.createdAt != null)
                         Text(
-                            'Added: ${quest.createdAt!.day.toString().padLeft(2, '0')}.${quest.createdAt!.month.toString().padLeft(2, '0')}.${quest.createdAt!.year}',
-                            style: theme.textTheme.bodySmall),
+                          'Assigned: ${quest.createdAt!.day.toString().padLeft(2, '0')}.${quest.createdAt!.month.toString().padLeft(2, '0')}.${quest.createdAt!.year}',
+                          style: theme.textTheme.bodySmall,
+                        ),
                       if (quest.isCompleted && quest.completedAt != null)
                         Text(
-                            'Completed: ${quest.completedAt!.day.toString().padLeft(2, '0')}.${quest.completedAt!.month.toString().padLeft(2, '0')}.${quest.completedAt!.year}',
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: Colors.greenAccent)),
+                          'Completed: ${quest.completedAt!.day.toString().padLeft(2, '0')}.${quest.completedAt!.month.toString().padLeft(2, '0')}.${quest.completedAt!.year}',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: Colors.greenAccent),
+                        ),
                     ],
                   ),
                 ),
@@ -132,7 +123,9 @@ class QuestCard extends StatelessWidget {
                       icon: const Icon(Icons.check_circle_outline),
                       label: const Text('Complete'),
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[700]),
+                        backgroundColor: Colors.green[700],
+                        foregroundColor: Colors.white,
+                      ),
                       onPressed: () {
                         Navigator.of(ctx).pop();
                         onComplete!();
@@ -140,9 +133,7 @@ class QuestCard extends StatelessWidget {
                     ),
                   TextButton(
                     child: const Text('Close'),
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                    },
+                    onPressed: () => Navigator.of(ctx).pop(),
                   ),
                 ],
               );
@@ -161,9 +152,11 @@ class QuestCard extends StatelessWidget {
                   Expanded(
                     child: Row(
                       children: [
-                        Icon(_getQuestTypeIcon(quest.type),
-                            color: theme.textTheme.titleMedium?.color,
-                            size: 20),
+                        Icon(
+                          quest.type.icon,
+                          color: theme.textTheme.titleMedium?.color,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -179,15 +172,17 @@ class QuestCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                        color: difficultyColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: difficultyColor, width: 1)),
+                      color: difficultyColor.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: difficultyColor, width: 1),
+                    ),
                     child: Text(
-                      QuestModel.getQuestDifficultyName(quest.difficulty),
+                      quest.difficulty.name,
                       style: TextStyle(
-                          color: difficultyColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14),
+                        color: difficultyColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ],
@@ -204,19 +199,23 @@ class QuestCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'XP: ${quest.xpReward}',
+                    '+${quest.xpReward} XP',
                     style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.amber[300],
-                        fontWeight: FontWeight.w500),
+                      fontSize: 14,
+                      color: Colors.amber[300],
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   if (onComplete != null && !quest.isCompleted)
                     ElevatedButton(
                       onPressed: onComplete,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green[700],
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         textStyle: const TextStyle(fontSize: 14),
                       ),
                       child: const Text('Complete'),
@@ -227,11 +226,15 @@ class QuestCard extends StatelessWidget {
                         Icon(Icons.check_circle,
                             color: Colors.greenAccent, size: 18),
                         SizedBox(width: 4),
-                        Text('Completed',
-                            style: TextStyle(
-                                color: Colors.greenAccent, fontSize: 14)),
+                        Text(
+                          'Completed',
+                          style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
-                    )
+                    ),
                 ],
               ),
             ],
